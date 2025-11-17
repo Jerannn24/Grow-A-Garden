@@ -36,19 +36,6 @@ Struktur folder (penting)
     ├── src/
     │   ├── models/        # data & logika (mis. Mahasiswa)
     │   ├── views/         # UI (PyQt5)
-    │   └── controllers/   # penghubung model & view
-    │
-    ├── backend/           # helper backend / util (opsional)
-    ├── database/          # tempat file SQLite (jika digunakan)
-    ├── main.py            # entrypoint aplikasi
+    │   ├── controllers/   # penghubung model & view
+    │   └── main.py        # entrypoint aplikasi
     └── README.md
-
-Catatan singkat
-
-- Jika model menggunakan SQLite, tempatkan file DB di `database/garden.db`.
-- Jika Anda ingin saya buat skrip inisialisasi database (`init_db.py`),
-  saya dapat menambahkannya.
-
-Contribusi
-
-- Buka issue atau kirim pull request untuk fitur dan perbaikan.
