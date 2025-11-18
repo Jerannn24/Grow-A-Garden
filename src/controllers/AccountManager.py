@@ -7,13 +7,13 @@ from PyQt5.QtCore import Qt
 # Import Model
 from models.UserModel import UserModel 
 
-# Import Views (sesuaikan nama file import sesuai struktur Anda)
+# Import Views 
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
 
 class AccountManager(QWidget): # <-- Nama kelas diubah sesuai permintaan
     """
-    Bertindak sebagai Controller: Mengelola QStackedWidget, menghubungkan View dan Model.
+    Mengelola QStackedWidget, menghubungkan View dan Model.
     """
     def __init__(self):
         super().__init__()
