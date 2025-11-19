@@ -104,7 +104,7 @@ class Post:
         cur.execute("""
             INSERT INTO postList (userID, repliedPostID, title, content, media, timeCreated, viewCount, likeCount)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, self.to_tuple())
+        """, self.toTuple())
         conn.commit()
         self.postID = cur.lastrowid
 
@@ -149,5 +149,33 @@ class Post:
                 posts.append(p)
         return posts
 
-    
+    @classmethod
+    def get_by_id(cls, conn: sqlite3.Connection, post_id: int) -> Optional["Post"]:
+        """Kembalikan Post atau None berdasarkan postID."""
+        cur = conn.execute("SELECT * FROM postList WHERE postID = ?", (post_id,))
+        row = cur.fetchone()
+        return cls.fromRowSQL(row) if row else None
+
+    @classmethod
+    def delete_by_id(cls, conn: sqlite3.Connection, post_id: int) -> None:
+        """Hapus post berdasarkan postID (helper opsional)."""
+        cur = conn.cursor()
+        cur.execute("DELETE FROM postList WHERE postID = ?", (post_id,))
+        conn.commit()
+
+    @classmethod
+    def get_all_posts(cls, conn: sqlite3.Connection, order_by: str = "timeCreated", limit: Optional[int] = None) -> List["Post"]:
+        """Ambil semua post, delegasi query terpusat di model."""
+        mapping = {"timeCreated": "timeCreated", "likes": "likeCount", "views": "viewCount"}
+        col = mapping.get(order_by, "timeCreated")
+        q = f"SELECT * FROM postList ORDER BY {col} DESC"
+        params: List[Any] = []
+        if limit is not None:
+            q += " LIMIT ?"
+            params.append(int(limit))
+        cur = conn.execute(q, tuple(params) if params else ())
+        rows = cur.fetchall()
+        return [cls.fromRowSQL(r) for r in rows if cls.fromRowSQL(r) is not None]
+
+
 
