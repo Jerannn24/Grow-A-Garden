@@ -1,12 +1,42 @@
 import sqlite3
+from typing import Optional, List, Any, Tuple
+import os
+
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
+DB_FILE_PATH = os.path.join(PROJECT_ROOT, 'data', 'app.db')
 
 class UserModel:
-    def __init__(self):
-        self.conn = sqlite3.connect('app.db')
-        self.createTable()
-        self.currentUser = None  # session user
+    def __init__(self,
+                 userID: Optional[int] = None, username: str = "", password: str = "",
+                 email: str = "",
+                 profileInfo: str = "",
+                 role: str = "user",
+                 reportCount: int = 0,
+                 status: str = "active",
+                 location: str = "unknown",
+                 notificationPreferences: str = "all",
+                 notificationTime: str = "08:00"):
+        self.userID = userID
+        self.username = username
+        self.password = password
+        self.email = email
+        self.profileInfo = profileInfo
+        self.role = role
+        self.reportCount = reportCount
+        self.status = status
+        self.location = location
+        self.notificationPreferences = notificationPreferences
+        self.notificationTime = notificationTime
+        
 
-    def createTable(self):
+    @staticmethod
+    def get_conn() -> sqlite3.Connection:
+        """Membuka koneksi database baru untuk operasi."""
+        return sqlite3.connect(DB_FILE_PATH)
+
+    def createTable(self, conn: sqlite3.Connection):
+        """Membuat tabel users jika belum ada."""
         query = """
         CREATE TABLE IF NOT EXISTS users (
             userID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,103 +52,57 @@ class UserModel:
             notificationTime TEXT DEFAULT '08:00'
         )
         """
-        self.conn.execute(query)
-        self.conn.commit()
+        conn.execute(query)
+        conn.commit()
 
     def registerUser(self, username, email, password, location, confirmPassword, profileInfo=""):
-        # validasi sederhana
         if not username or not email or not password or not confirmPassword or not location:
             return False, "Semua field harus diisi!"
-
         if password != confirmPassword:
             return False, "Password dan konfirmasi password tidak cocok!"
 
+        conn = self.get_conn()
+        self.createTable(conn) 
+
         try:
             query = "INSERT INTO users (username, email, password, location, profileInfo) VALUES (?, ?, ?, ?, ?)"
-            self.conn.execute(query, (username, email, password, location, profileInfo))
-            self.conn.commit()
+            conn.execute(query, (username, email, password, location, profileInfo))
+            conn.commit()
             return True, "Registrasi berhasil!"
         except sqlite3.IntegrityError:
             return False, "Username atau email sudah terdaftar!"
 
-    def loginUser(self, email, password):
-        query = """
-        SELECT userID, username, email, profileInfo, role, reportCount, status, location,
-            notificationPreferences, notificationTime
-        FROM users
-        WHERE email = ? AND password = ?
-        """
-        cursor = self.conn.execute(query, (email, password))
-        user = cursor.fetchone()
-        
-        if user:
-            # simpan semua properti di session
-            self.currentUser = {
-                "userID": user[0],
-                "username": user[1],
-                "email": user[2],
-                "profileInfo": user[3],
-                "role": user[4],
-                "reportCount": user[5],
-                "status": user[6],
-                "location": user[7],
-                "notificationPreferences": user[8],
-                "notificationTime": user[9]
-            }
-            return True, "Login berhasil!"
+    def loginUser(self, email: str, password: str) -> Tuple[Optional["UserModel"], str]:
+        conn = self.get_conn()
+        query = "SELECT * FROM users WHERE email = ? AND password = ?"
+        cursor = conn.execute(query, (email, password))
+        user_row = cursor.fetchone()
+
+        if user_row:
+            user_instance = UserModel.fromRowSQL(user_row)
+            if user_instance:
+                user_instance.password = ""
+            return user_instance, "Login berhasil!"
         else:
-            return False, "Username atau password salah!"
+            return None, "Email atau password salah!"
 
-    def getAllUsers(self):
-        cursor = self.conn.execute("SELECT userID, username, email FROM users")
-        return cursor.fetchall()
-
-    def getCurrentUser(self):
-        return self.currentUser
-
-    def logoutUser(self):
-        self.currentUser = None
-
-    def updateProfile(self, userID, profileInfo=None, location=None,
-                          notificationPreferences=None, notificationTime=None):
-        updates = []
-        params = []
-
-        if profileInfo is not None:
-            updates.append("profileInfo = ?")
-            params.append(profileInfo)
-        if location is not None:
-            updates.append("location = ?")
-            params.append(location)
-        if notificationPreferences is not None:
-            updates.append("notificationPreferences = ?")
-            params.append(notificationPreferences)
-        if notificationTime is not None:
-            updates.append("notificationTime = ?")
-            params.append(notificationTime)
-
-        if not updates:
-            return False, "Tidak ada data yang diupdate!"
-
-        params.append(userID)
-        query = f"UPDATE users SET {', '.join(updates)} WHERE userID = ?"
-        self.currentUser["profileInfo"] = profileInfo if profileInfo is not None else self.currentUser.get('profileInfo')
-        self.currentUser["location"] = location if location is not None else self.currentUser.get('location')
-        self.currentUser["notificationPreferences"] = notificationPreferences if notificationPreferences is not None else self.currentUser.get('notificationPreferences')
-        self.currentUser["notificationTime"] = notificationTime if notificationTime is not None else self.currentUser.get('notificationTime')
-        self.conn.execute(query, params)
-        self.conn.commit()
-        return True, "Profil berhasil diperbarui!"
-    
-    def changePassword(self, username, email, newPassword, confirmNewPassword):
-        if newPassword != confirmNewPassword:
-            return False, "Password dan konfirmasi password tidak cocok!"
-
-        query = "UPDATE users SET password = ? WHERE username = ? AND email = ?"
-        cursor = self.conn.execute(query, (newPassword, username, email))
-        self.conn.commit()
-
-        if cursor.rowcount == 0:
-            return False, "username atau email tidak valid!"
+    @classmethod
+    def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
+        if row is None or len(row) < 11:
+            return None
         
-        return True, "Password berhasil diubah!"
+        try:
+            return cls(
+                userID=row[0], username=row[1], password=row[2], email=row[3], 
+                profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7], 
+                location=row[8], notificationPreferences=row[9], notificationTime=row[10]
+            )
+        except Exception:
+            return None
+
+    @classmethod
+    def getByID(cls, user_id: int) -> Optional["UserModel"]:
+        conn = cls.get_conn()
+        cur = conn.execute("SELECT * FROM users WHERE userID = ?", (user_id,))
+        row = cur.fetchone()
+        return cls.fromRowSQL(row) if row else None

@@ -1,9 +1,40 @@
 import sys
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QSpacerItem, QSizePolicy, QPushButton, QLineEdit
+import os
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton
 from PyQt5.QtCore import Qt, QDateTime
-from src.controllers.PostManager import PostManager
+from models.UserModel import DB_FILE_PATH
+# ============================================
+# PATH CONFIGURATION
+# ============================================
+THIS_FILE = os.path.abspath(__file__)
+VIEWS_DIR = os.path.dirname(THIS_FILE)
+SRC_DIR = os.path.dirname(VIEWS_DIR)
 
-# --- 1. MULTI-WIDGET HEADER (Sesuai Gambar I-08) ---
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+# ============================================
+# IMPORTS
+# ============================================
+try:
+    from controllers.PostManager import PostManager
+except ImportError as e:
+    print(f"❌ Import Error in DisplayCommunity: {e}")
+    print(f"   SRC_DIR: {SRC_DIR}")
+    print(f"   sys.path: {sys.path}")
+    
+    # Dummy fallback
+    from PyQt5.QtWidgets import QLabel
+    class PostManager(QWidget):
+        def __init__(self, db_path, parent=None):
+            super().__init__(parent)
+            self.setLayout(QVBoxLayout())
+            self.layout().addWidget(QLabel(f"PostManager Load Failed\nError: {e}"))
+        
+        def reload_list(self, order_by="timeCreated"):
+            pass
+
+# --- 1. COMMUNITY HEADER ---
 class CommunityHeader(QWidget):
     def __init__(self):
         super().__init__()
@@ -13,17 +44,16 @@ class CommunityHeader(QWidget):
         main_h_layout.setContentsMargins(0, 0, 0, 0) 
         main_h_layout.setSpacing(10)
 
-        # A. TIME COLUMN (Kiri)
+        # A. TIME COLUMN
         time_col = QVBoxLayout()
         time_col.setContentsMargins(0, 0, 0, 0)
         time_col.setSpacing(2)
 
-        # Tanggal (Wednesday, Wednesday, November 12, 2025)
-        date_lbl = QLabel("Wednesday, Wednesday, November 12, 2025")
+        current_datetime = QDateTime.currentDateTime()
+        date_lbl = QLabel(current_datetime.toString("dddd, MMMM dd, yyyy"))
         date_lbl.setStyleSheet("color: gray; font-size: 14px;")
         
-        # Waktu Besar dan Tebal
-        time_lbl = QLabel("09:27:35 PM") 
+        time_lbl = QLabel(current_datetime.toString("hh:mm:ss AP"))
         time_lbl.setStyleSheet("font-size: 30px; font-weight: bold; color: #007F00;")
         
         time_col.addWidget(date_lbl)
@@ -32,8 +62,7 @@ class CommunityHeader(QWidget):
         main_h_layout.addLayout(time_col)
         main_h_layout.addStretch()
 
-        # B. WEATHER & INFO WIDGETS (Kanan - Menggunakan QFrame tunggal untuk setiap kotak)
-        
+        # B. INFO BOXES
         def create_info_box(icon, main_text, sub_text=None, location=None):
             frame = QFrame()
             frame.setStyleSheet("background-color: white; border-radius: 8px; padding: 5px 10px; border: 1px solid #ddd;")
@@ -41,7 +70,6 @@ class CommunityHeader(QWidget):
             v_layout.setContentsMargins(5, 5, 5, 5)
             v_layout.setSpacing(2)
             
-            # Baris Utama (Icon + Main Text)
             h_top_layout = QHBoxLayout()
             h_top_layout.setContentsMargins(0, 0, 0, 0)
             
@@ -57,13 +85,11 @@ class CommunityHeader(QWidget):
             
             v_layout.addLayout(h_top_layout)
 
-            # Sub Text (Sunny/Humidity)
             if sub_text:
                 sub_lbl = QLabel(sub_text)
                 sub_lbl.setStyleSheet("color: gray; font-size: 11px; margin-left: 18px;")
                 v_layout.addWidget(sub_lbl)
             
-            # Lokasi
             if location:
                 loc_lbl = QLabel(location)
                 loc_lbl.setStyleSheet("color: #795548; font-size: 11px; margin-left: 18px;")
@@ -71,25 +97,18 @@ class CommunityHeader(QWidget):
 
             return frame
 
-        # Kotak 1: Suhu & Cuaca
         main_h_layout.addWidget(create_info_box("☀️", "28°C", "Sunny"))
-        
-        # Kotak 2: Angin & Kelembaban
         main_h_layout.addWidget(create_info_box("💨", "12 km/h", "Humidity: 65%"))
-
-        # Kotak 3: Lokasi (di gambar I-08, ini adalah kotak info terpisah)
         main_h_layout.addWidget(create_info_box("📍", "Jakarta, Indonesia"))
 
 
-# --- 2. SHARE POST WIDGET (Input Post Baru - Mematuhi tata letak Gambar I-08) ---
+# --- 2. SHARE POST WIDGET ---
 class SharePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
         super().__init__(parent)
         self.post_manager = post_manager
         
-        # Menggunakan QFrame sebagai container untuk styling background putih
         frame = QFrame()
-        # Mengurangi padding untuk membuat box lebih kecil
         frame.setStyleSheet("background-color: white; border-radius: 10px; padding: 10px; border: 1px solid #E0E0E0;")
         
         main_layout = QVBoxLayout(self)
@@ -103,13 +122,11 @@ class SharePostWidget(QWidget):
         input_row = QHBoxLayout()
         input_row.setSpacing(10)
         
-        # Avatar Placeholder (Kiri)
         avatar_lbl = QLabel("🌱")
         avatar_lbl.setFixedSize(30, 30)
         avatar_lbl.setAlignment(Qt.AlignCenter)
         avatar_lbl.setStyleSheet("background-color: #E8F5E9; border-radius: 15px; font-size: 16px;")
         
-        # Input Text (Placeholder)
         self.input_label = QLabel("Share your gardening moment...")
         self.input_label.setCursor(Qt.PointingHandCursor)
         self.input_label.setStyleSheet("font-size: 14px; color: gray; border: none; padding-left: 10px;")
@@ -120,26 +137,21 @@ class SharePostWidget(QWidget):
         
         frame_layout.addLayout(input_row)
 
-        # 2. Action Row (Icons)
+        # 2. Action Row
         actions_row = QHBoxLayout()
-        # Mengatur margin lebih kecil karena tombol Post dihapus
         actions_row.setContentsMargins(40, 5, 0, 0) 
         actions_row.setSpacing(10)
         
-        # Ikon Media (Gambar) - Diganti menjadi tombol yang memicu pop-up
         self.btn_media = QPushButton("🖼️") 
         self.btn_media.setStyleSheet("background: none; border: none; font-size: 18px; color: #007F00;")
         self.btn_media.clicked.connect(self._open_create_post) 
 
-        # Ikon Like (Dummy)
         like_icon = QLabel("🤍") 
         
         actions_row.addWidget(self.btn_media)
         actions_row.addWidget(like_icon)
         actions_row.addStretch()
         
-        # Tombol POST (dihapus dari sini karena duplikasi, hanya ada di pop-up)
-        # Jika Anda ingin tombol Post tampil di sini (seperti gambar I-08):
         self.post_button = QPushButton("Post")
         self.post_button.setFixedSize(70, 30)
         self.post_button.setStyleSheet("""
@@ -149,35 +161,42 @@ class SharePostWidget(QWidget):
                 border-radius: 15px; 
                 font-weight: bold;
             }
+            QPushButton:hover {
+                background-color: #7CB342;
+            }
         """)
         self.post_button.clicked.connect(self._open_create_post)
         actions_row.addWidget(self.post_button)
         
         frame_layout.addLayout(actions_row)
 
-        # Connections (Input label tetap memicu dialog create post)
         self.input_label.mousePressEvent = lambda event: self._open_create_post()
 
     def _open_create_post(self):
-        # ... (Logika yang sama) ...
         if hasattr(self.post_manager, 'switch_to_create_post'):
             self.post_manager.switch_to_create_post()
 
 
-# --- 3. COMMUNITY PAGE (Menyatukan semua komponen) ---
+# --- 3. DISPLAY COMMUNITY (MAIN CLASS) ---
 class DisplayCommunity(QWidget):
-    def __init__(self, db_path: str = "app.db", parent=None):
+    def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
+        
+        # Pastikan db_path adalah absolute path
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(SRC_DIR, db_path)
+        
+        print(f"🌐 DisplayCommunity using database: {db_path}")
+        
         layout = QVBoxLayout(self)
-        # Margin yang sesuai agar konten tidak mepet tepi
         layout.setContentsMargins(30, 30, 30, 30) 
-        layout.setSpacing(20) # Spacing antar widget
+        layout.setSpacing(20)
 
-        # 1. Multi-Widget Header (Waktu, Cuaca, dll.)
+        # 1. Header
         header_widget = CommunityHeader()
         layout.addWidget(header_widget) 
 
-        # 2. Judul Utama Community Feed & Slogan
+        # 2. Title Section
         title_container = QWidget()
         title_layout = QVBoxLayout(title_container)
         title_layout.setContentsMargins(0, 0, 0, 0)
@@ -194,19 +213,19 @@ class DisplayCommunity(QWidget):
         
         layout.addWidget(title_container)
         
-        # 3. Share Post Widget (Input di atas feed)
+        # 3. Share Post Widget
         self.post_manager = PostManager(db_path=db_path)
         share_post_widget = SharePostWidget(post_manager=self.post_manager)
         layout.addWidget(share_post_widget)
         
-        # 4. Tab Navigasi (Recent, Top Likes, Top Views)
+        # 4. Tab Navigation
         tab_layout = QHBoxLayout()
-        # Perlu menggunakan QPushButton dengan style yang sesuai
+        
         self.btn_recent = self._create_tab_button("Recent", is_active=True)
         self.btn_likes = self._create_tab_button("Top Likes")
         self.btn_views = self._create_tab_button("Top Views")
         
-        # KUNCI: Menghubungkan tombol tab ke PostManager
+        # Connect tabs to PostManager
         self.btn_recent.clicked.connect(lambda: self.post_manager.reload_list("timeCreated"))
         self.btn_likes.clicked.connect(lambda: self.post_manager.reload_list("likes"))
         self.btn_views.clicked.connect(lambda: self.post_manager.reload_list("views"))
@@ -218,8 +237,7 @@ class DisplayCommunity(QWidget):
         
         layout.addLayout(tab_layout)
 
-        # 5. PostManager Content (Feed itu sendiri)
-        # Asumsi: PostManager hanya menampilkan QListWidget (daftar post) dan logika kosong/ada post.
+        # 5. PostManager Content (Feed)
         layout.addWidget(self.post_manager)
         
         layout.addStretch()
@@ -238,9 +256,15 @@ class DisplayCommunity(QWidget):
                 margin-right: 5px;
             }
             QPushButton:checked {
-                background-color: #007F00; /* Warna hijau solid */
+                background-color: #007F00;
                 color: white; 
                 font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #E0E0E0;
+            }
+            QPushButton:checked:hover {
+                background-color: #006600;
             }
         """)
         return btn

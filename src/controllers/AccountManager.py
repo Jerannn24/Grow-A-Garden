@@ -1,20 +1,18 @@
-# File: controller/account_manager.py
+# File: controller/AccountManager.py
 
 import sys
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from PyQt5.QtCore import Qt
+from typing import Optional
 
 # Import Model
 from models.UserModel import UserModel 
-
 # Import Views 
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
+from views.HomeScreen import MainWindow
 
-class AccountManager(QWidget): # <-- Nama kelas diubah sesuai permintaan
-    """
-    Mengelola QStackedWidget, menghubungkan View dan Model.
-    """
+class AccountManager(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Grow a Garden Application - Account Manager")
@@ -26,17 +24,14 @@ class AccountManager(QWidget): # <-- Nama kelas diubah sesuai permintaan
         mainLayout = QVBoxLayout(self)
         mainLayout.addWidget(self.stackWidget)
         
-        # 1. Inisialisasi Model
-        self.model = UserModel() 
+        self.model = UserModel()
+        self.currentUser: Optional[UserModel] = None 
         
-        # 2. Inisialisasi Views dan Hubungkan
         self._initViews()
         
         self.switchView('login')
 
     def _initViews(self):
-        """Membuat View dan mengatur koneksi sinyal-slot."""
-        
         self.loginView = LoginForm()
         self.stackWidget.addWidget(self.loginView)
         self.widgets['login'] = self.loginView
@@ -44,34 +39,39 @@ class AccountManager(QWidget): # <-- Nama kelas diubah sesuai permintaan
         self.registerView = RegisterForm()
         self.stackWidget.addWidget(self.registerView)
         self.widgets['register'] = self.registerView
+
+        self.homeScreenView = MainWindow()
+        self.stackWidget.addWidget(self.homeScreenView)
+        self.widgets['homescreen'] = self.homeScreenView
         
         
+        self.loginView.switchToHomeScreen.connect(lambda: self.switchView('homescreen'))
         self.loginView.switchToRegisterRequested.connect(lambda: self.switchView('register'))
-        self.registerView.switchToLoginRequested.connect(lambda: self.switchView('login')) 
-        
         self.loginView.loginRequested.connect(self.handleLoginRequest)
-        self.registerView.registerRequested.connect(self.handleRegisterRequest) 
+        
+        self.registerView.switchToLoginRequested.connect(lambda: self.switchView('login'))
+        self.registerView.registerRequested.connect(self.handleRegisterRequest)
+        
+        self.homeScreenView.logoutRequested.connect(self.handleLogoutRequest) 
 
-
-    def handleLoginRequest(self, email, password):
-        """Menerima input dari LoginView, memanggil Model, dan mengarahkan tampilan."""
-        print(email, " ", password)
-        success, message = self.model.loginUser(email.strip(), password.strip())
+    
+    def handleLoginRequest(self, email, password):        
+        user_instance, message = self.model.loginUser(email.strip(), password.strip())
         
         self.loginView.clearForm()
 
-        if success:
-            userData = self.model.getCurrentUser()
-            print(f"✅ Login Sukses untuk: {userData['username']}. Pindah ke Homescreen.")
-            
-            # TODO: Tambahkan HomeView ke self.widgets dan gunakan:
-            # self.switchView('homescreen') 
-            
+        if user_instance:
+            self.currentUser = user_instance
+            self.homeScreenView.set_current_user(self.currentUser)
+            self.switchView('homescreen')
+            print(f"✅ Login Sukses untuk: {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
+                        
         else:
-             print(f"{message}")
+             print(f"❌ Login Gagal: {message}")
+             self.loginView.errorDisplay.emit(message)
+
 
     def handleRegisterRequest(self, username, email, password, location, confirmPassword):
-        """Menerima input dari RegisterView, memanggil Model."""
         success, message = self.model.registerUser(username.strip(), email.strip(), password.strip(), location.strip(), confirmPassword.strip())
         
         if success:
@@ -81,8 +81,14 @@ class AccountManager(QWidget): # <-- Nama kelas diubah sesuai permintaan
             self.switchView('login')
             
         else:
-            print(f"{message}")
-    # --- View Manager ---
+            print(f"❌ Registrasi Gagal: {message}")
+            self.registerView.errorDisplay.emit(message)
+            
+    def handleLogoutRequest(self):
+        self.currentUser = None
+        print("Pengguna berhasil logout.")
+        self.switchView('login')
+
     
     def switchView(self, viewName):
         """Mengganti tampilan yang ditampilkan di QStackedWidget."""

@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton,
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap, QFont, QIcon
 import os
+from models.UserModel import DB_FILE_PATH
 
 class DisplayPost(QWidget):
     # Signals
@@ -11,7 +12,7 @@ class DisplayPost(QWidget):
     deleteRequested = pyqtSignal(int)
     backRequested = pyqtSignal()
 
-    def __init__(self, db_path: str = "app.db", parent=None):
+    def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         # ... (koneksi DB sama seperti sebelumnya) ...
 

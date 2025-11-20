@@ -1,5 +1,7 @@
 import sys
 import os
+
+from models.UserModel import DB_FILE_PATH
 project_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 if project_root_dir not in sys.path:
@@ -19,7 +21,7 @@ from src.controllers.PlantManager import PlantManager
 from src.views.DisplayCommunity import DisplayCommunity # Jika Anda menggunakan ini
 from src.models.Post import Post                       # Jika Anda menggunakan ini
 from src.controllers.PostManager import PostManager
-
+from src.models.UserModel import UserModel
 # --- KONFIGURASI WARNA & STYLE (TETAP SAMA) ---
 STYLE_SHEET = """
     QMainWindow { background-color: #F8F9FA; }
@@ -85,6 +87,7 @@ class Sidebar(QFrame):
         layout.addWidget(self.btn_settings)
         
         user_lbl = QLabel("👤 John Doe\nProfile")
+        user_lbl.setObjectName('user_info_label')
         user_lbl.setStyleSheet("color: white; padding: 10px;")
         layout.addWidget(user_lbl)
         
@@ -258,8 +261,7 @@ class HomePage(QWidget):
         # --- 1. Inisialisasi Manager ---
         self.plant_manager = PlantManager()
         # Pastikan ada user ID dummy atau dari login
-        # Di sini saya hardcode "user123" untuk contoh
-        self.current_user_id = "user123" 
+        self.current_user_id = None
         # Load data awal dari DB ke memory
         self.plant_manager.loadUserData(self.current_user_id) 
 
@@ -279,6 +281,9 @@ class HomePage(QWidget):
         self.grid = QGridLayout(self.content_widget)
         self.grid.setSpacing(20)
         self.grid.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        max_cols = 3 
+        for i in range(max_cols): 
+            self.grid.setColumnStretch(i, 1)
         
         self.scroll.setWidget(self.content_widget)
         self.main_layout.addWidget(self.scroll)
@@ -291,6 +296,10 @@ class HomePage(QWidget):
         print("--- DEBUG REFRESH ---")
         print(f"ID Objek PlantManager: {id(self.plant_manager)}")
         print(f"Isi plantList: {self.plant_manager.plantList}")
+        
+        if not self.current_user_id:
+            print("Peringatan: UserID belum diset. Tidak memuat tanaman.")
+            return
         
         # 1. HAPUS SEMUA WIDGET LAMA DARI GRID
         # Kita loop terbalik untuk menghapus dengan aman
@@ -352,9 +361,20 @@ class HomePage(QWidget):
             
             if row == 0 and col == 0:
                 col = 1
-
+                
+    def set_current_user_id(self, userID: int):
+        if self.current_user_id != userID:
+            self.current_user_id = userID
+            # Muat data saat UserID sudah valid
+            self.plant_manager.loadUserData(self.current_user_id)
+            self.refresh_plant_list()
+    
     def open_add_plant_form(self):
         """Membuka dialog tambah tanaman."""
+        if not self.current_user_id:
+             QMessageBox.critical(self, "Error", "UserID belum terdeteksi. Silakan login ulang.")
+             return
+         
         form = AddPlantForm(self)
         
         if form.exec_() == QDialog.Accepted:
@@ -384,6 +404,7 @@ class HomePage(QWidget):
 
 # --- MAIN WINDOW (Logika Navigasi) ---
 class MainWindow(QMainWindow):
+    logoutRequested = pyqtSignal()
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Grow a Garden UI")
@@ -404,10 +425,11 @@ class MainWindow(QMainWindow):
         
         # Inisialisasi Halaman
         self.home_page = HomePage()
-        self.community_page = DisplayCommunity(db_path="app.db") 
+        self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
         self.settings_page = QWidget() 
 
+        self.setStyleSheet(STYLE_SHEET)
         # Tambahkan ke Stacked Widget
         self.pages.addWidget(self.home_page)      # index 0 (Home)
         self.pages.addWidget(self.community_page) # index 1 (Community)
@@ -428,7 +450,17 @@ class MainWindow(QMainWindow):
         # Set Halaman Awal ke Home
         self.pages.setCurrentIndex(0)
         self.nav_buttons["home"].setChecked(True) 
-
+        self.current_user = None
+    
+    def set_current_user(self, user_model):
+        self.current_user = user_model
+        
+        user_lbl = self.sidebar.findChild(QLabel, 'user_info_label') 
+        if user_lbl:
+            user_lbl.setText(f"👤 {user_model.username}\nID: {user_model.userID}")
+            
+        self.home_page.set_current_user_id(user_model.userID)
+        
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)
         
@@ -446,7 +478,7 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     # Setup DB Awal
     try:
-        conn = sqlite3.connect("app.db")
+        conn = sqlite3.connect(DB_FILE_PATH)
         Post.create_table(conn)
         conn.close()
     except Exception as e:

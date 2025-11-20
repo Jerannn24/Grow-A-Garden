@@ -1,9 +1,8 @@
 import sqlite3
 from datetime import datetime
+from models.UserModel import DB_FILE_PATH
 
 class Plant:
-    DB_NAME = "app.db"
-
     def __init__(self, userID, plantID, plantName, plantSpecies, 
                  plantingStartDate, plantMedia=None, wateringFrequency=None, 
                  lightingDuration=None, dailyWaterReq=None, dailyLightingReq=None, 
@@ -33,7 +32,7 @@ class Plant:
 
     @staticmethod
     def _get_db_connection():
-        conn = sqlite3.connect(Plant.DB_NAME)
+        conn = sqlite3.connect(DB_FILE_PATH)
         conn.row_factory = sqlite3.Row
         return conn
 
