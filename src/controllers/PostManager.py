@@ -148,8 +148,7 @@ class CreatePostWidget(QWidget):
             QMessageBox.warning(self, "Peringatan", "Isi post tidak boleh kosong.")
             return
         
-        currentUser = self.post_manager.user_model.getCurrentUser()
-        user_id = currentUser.get("userID") if currentUser else None
+        user_id = self.post_manager.user_model.userID
         
         time_created = QDateTime.currentDateTime().toString(Qt.ISODate)
 
@@ -243,6 +242,10 @@ class PostManager(QWidget):
         except Exception as e:
             print(f"❌ Error connecting to database: {e}")
             self.conn = None
+
+    def set_current_user(self, user_model: UserModel):
+        """Set the current logged-in user."""
+        self.user_model = user_model
 
     def switch_to_create_post(self):
         self.stackWidget.setCurrentWidget(self.create_post_widget)
