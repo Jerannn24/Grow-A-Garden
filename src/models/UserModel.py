@@ -1,5 +1,10 @@
 import sqlite3
 from typing import Optional, List, Any, Tuple
+import os
+
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
+DB_FILE_PATH = os.path.join(PROJECT_ROOT, 'data', 'app.db')
 
 class UserModel:
     def __init__(self,
@@ -28,7 +33,7 @@ class UserModel:
     @staticmethod
     def get_conn() -> sqlite3.Connection:
         """Membuka koneksi database baru untuk operasi."""
-        return sqlite3.connect('app.db')
+        return sqlite3.connect(DB_FILE_PATH)
 
     def createTable(self, conn: sqlite3.Connection):
         """Membuat tabel users jika belum ada."""

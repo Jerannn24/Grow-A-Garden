@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton
 from PyQt5.QtCore import Qt, QDateTime
-
+from models.UserModel import DB_FILE_PATH
 # ============================================
 # PATH CONFIGURATION
 # ============================================
@@ -179,7 +179,7 @@ class SharePostWidget(QWidget):
 
 # --- 3. DISPLAY COMMUNITY (MAIN CLASS) ---
 class DisplayCommunity(QWidget):
-    def __init__(self, db_path: str = "app.db", parent=None):
+    def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         
         # Pastikan db_path adalah absolute path

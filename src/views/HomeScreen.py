@@ -1,5 +1,7 @@
 import sys
 import os
+
+from models.UserModel import DB_FILE_PATH
 project_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 if project_root_dir not in sys.path:
@@ -423,7 +425,7 @@ class MainWindow(QMainWindow):
         
         # Inisialisasi Halaman
         self.home_page = HomePage()
-        self.community_page = DisplayCommunity(db_path="app.db") 
+        self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
         self.settings_page = QWidget() 
 
@@ -476,7 +478,7 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     # Setup DB Awal
     try:
-        conn = sqlite3.connect("app.db")
+        conn = sqlite3.connect(DB_FILE_PATH)
         Post.create_table(conn)
         conn.close()
     except Exception as e:

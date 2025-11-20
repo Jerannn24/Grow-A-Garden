@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget,
                              QListWidgetItem, QApplication, QLabel, QPushButton, 
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QDateTime
-
+from models.UserModel import DB_FILE_PATH
 # ============================================
 # PATH CONFIGURATION
 # ============================================
@@ -176,7 +176,7 @@ class CreatePostWidget(QWidget):
 
 # --- POST MANAGER ---
 class PostManager(QWidget):
-    def __init__(self, db_path: str = "app.db", parent=None):
+    def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         
         # Pastikan db_path adalah absolute path
