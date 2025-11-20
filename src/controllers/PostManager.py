@@ -7,9 +7,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget,
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QDateTime
 
-# ============================================
-# PATH CONFIGURATION
-# ============================================
+# path
 THIS_FILE = os.path.abspath(__file__)
 CONTROLLERS_DIR = os.path.dirname(THIS_FILE)
 SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
@@ -17,29 +15,10 @@ SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-# ============================================
-# IMPORTS
-# ============================================
-try:
-    from views.DisplayPost import DisplayPost
-except ImportError:
-    class DisplayPost(QWidget):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-            self.setLayout(QVBoxLayout())
-            self.layout().addWidget(QLabel("DisplayPost tidak ditemukan"))
-        
-        def render_post(self, post, replies_count=0):
-            pass
+from views.DisplayPost import DisplayPost
+from models.Post import Post
+from models.UserModel import UserModel
 
-try:
-    from models.Post import Post
-    from models.UserModel import UserModel
-except ImportError:
-    print("ERROR: models.Post tidak dapat diimport")
-    sys.exit(1)
-
-# --- CREATE POST WIDGET ---
 class CreatePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
         super().__init__(parent)
@@ -51,28 +30,23 @@ class CreatePostWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        # Title
         lbl_title = QLabel("📝 Buat Post Baru")
         lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #004d00; margin-bottom: 20px;")
         layout.addWidget(lbl_title)
 
-        # Input Title
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Masukkan Judul Post (Opsional)")
         self.title_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
         layout.addWidget(self.title_input)
 
-        # Input Content
         self.content_input = QTextEdit()
         self.content_input.setPlaceholderText("Apa yang ingin kamu bagikan tentang kebunmu?")
         self.content_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-height: 150px;")
         layout.addWidget(self.content_input)
 
-        # Media Status Label
         self.media_status_lbl = QLabel("Tidak ada gambar dipilih.")
         self.media_status_lbl.setStyleSheet("color: #007F00; font-style: italic; margin-top: 5px;")
         
-        # Media Button
         media_action_layout = QHBoxLayout()
         self.btn_add_media = QPushButton("🖼️ Tambah Gambar")
         self.btn_add_media.setStyleSheet("""
@@ -90,7 +64,6 @@ class CreatePostWidget(QWidget):
         media_action_layout.addStretch(1)
         layout.addLayout(media_action_layout)
 
-        # Action Buttons
         btn_layout = QHBoxLayout()
         self.cancel_button = QPushButton("Batal")
         self.cancel_button.setStyleSheet("""
@@ -178,12 +151,10 @@ class CreatePostWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error DB", f"Gagal membuat post: {e}")
 
-# --- POST MANAGER ---
 class PostManager(QWidget):
     def __init__(self, db_path: str = "app.db", parent=None):
         super().__init__(parent)
         
-        # Pastikan db_path adalah absolute path
         if not os.path.isabs(db_path):
             db_path = os.path.join(SRC_DIR, db_path)
         
@@ -192,14 +163,13 @@ class PostManager(QWidget):
         self.user_model = UserModel()
         self._setup_db()
 
-        # UI Setup
         self.stackWidget = QStackedWidget()
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.stackWidget)
 
-        # --- FEED PAGE ---
+        # Halaman feed
         self.feed_page = QWidget()
         feed_layout = QVBoxLayout(self.feed_page)
         feed_layout.setContentsMargins(0, 0, 0, 0)
@@ -238,11 +208,10 @@ class PostManager(QWidget):
         
         self.stackWidget.addWidget(self.feed_page)
 
-        # --- DETAIL PAGE ---
         self.detail_view = DisplayPost()
         self.stackWidget.addWidget(self.detail_view)
 
-        # --- CREATE POST PAGE ---
+        # create post
         self.create_post_widget = CreatePostWidget(post_manager=self)
         self.stackWidget.addWidget(self.create_post_widget)
         
@@ -273,7 +242,7 @@ class PostManager(QWidget):
         self.list_widget.clear()
         posts = Post.get_all_posts(self.conn, order_by=order_by, limit=limit)
         
-        posts = [p for p in posts if p.repliedPostID is None] # Post yang utama-utama ae
+        posts = [p for p in posts if p.repliedPostID is None]
         
         if not posts:
             self.no_post_label.show()
@@ -284,14 +253,11 @@ class PostManager(QWidget):
             
             for p in posts:
                 username = Post.getUsernameByID(self.conn, p.getAuthor())
-                # Ambil title dan content
                 title = p.getTitle() or ""
                 content = p.getContent() or ""
-                
-                # Buat preview content yang lebih panjang
+            
                 content_preview = (content[:100] + '...') if len(content) > 100 else content
                 
-                # Format dengan HTML untuk styling yang lebih baik
                 if title:
                     display_text = f"""
                     <div style='padding: 5px;'>
@@ -329,7 +295,6 @@ class PostManager(QWidget):
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, p.getPostID())
                 
-                # Buat widget custom untuk setiap item
                 widget = QWidget()
                 widget_layout = QVBoxLayout(widget)
                 widget_layout.setContentsMargins(15, 15, 15, 15)
@@ -339,8 +304,7 @@ class PostManager(QWidget):
                 label.setWordWrap(True)
                 label.setTextFormat(Qt.RichText)
                 widget_layout.addWidget(label)
-                
-                # Set size hint yang lebih besar untuk item
+            
                 item.setSizeHint(widget.sizeHint())
                 
                 self.list_widget.addItem(item)

@@ -8,7 +8,7 @@ if project_root_dir not in sys.path:
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, \
                             QHBoxLayout, QLabel, QPushButton, QFrame, \
                             QGridLayout, QScrollArea, QSizePolicy, QStackedWidget, \
-                            QMessageBox, QDialog # Tambahkan QDialog
+                            QMessageBox, QDialog 
 
 from PyQt5.QtCore import Qt, QSize, QDateTime, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
@@ -16,11 +16,10 @@ import sqlite3
 
 from src.views.AddPlantForm import AddPlantForm
 from src.controllers.PlantManager import PlantManager
-from src.views.DisplayCommunity import DisplayCommunity # Jika Anda menggunakan ini
-from src.models.Post import Post                       # Jika Anda menggunakan ini
+from src.views.DisplayCommunity import DisplayCommunity 
+from src.models.Post import Post                       
 from src.controllers.PostManager import PostManager
 
-# --- KONFIGURASI WARNA & STYLE (TETAP SAMA) ---
 STYLE_SHEET = """
     QMainWindow { background-color: #F8F9FA; }
     
@@ -54,7 +53,7 @@ STYLE_SHEET = """
     QFrame#AddCard { background-color: #F5F5F5; border: 2px dashed #BDBDBD; border-radius: 12px; }
 """
 
-# --- SIDEBAR (Tetap sama) ---
+# SIDEBAR 
 class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -100,31 +99,26 @@ class Sidebar(QFrame):
     def get_nav_buttons(self):
         return self._buttons
 
-# --- CLASS HEADER (Diintegrasikan ke HomeScreen.py) ---
-# Di dalam HomeScreen.py
-
 class AppHeader(QWidget):
     def __init__(self, title_text: str, subtitle_text: str = None):
         super().__init__()
         self.setStyleSheet("background-color: #F8F9FA;")
         
-        # Main Vertical Layout (menampung semua baris)
         main_v_layout = QVBoxLayout(self)
         main_v_layout.setContentsMargins(0, 0, 0, 0)
-        main_v_layout.setSpacing(5) # Spacing vertikal yang lebih sedikit
+        main_v_layout.setSpacing(5) 
 
-        # 1. TOP ROW: Time/Date & Weather (Baris ini harus sejajar)
         top_h_layout = QHBoxLayout()
-        top_h_layout.setSpacing(20) # Spacing antara waktu dan cuaca
+        top_h_layout.setSpacing(20) 
         
-        # A. Time/Date Column
+        # Time/Date 
         time_col = QVBoxLayout()
         time_col.setContentsMargins(0, 0, 0, 0)
         time_col.setSpacing(2)
         
         date_lbl = QLabel(QDateTime.currentDateTime().toString("dddd, MMMM dd, yyyy"))
         date_lbl.setStyleSheet("color: gray; font-size: 14px;")
-        # Menggunakan waktu hardcoded dari gambar Anda untuk konsistensi visual
+        
         time_lbl = QLabel("07:44:14 PM") 
         time_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #007F00;")
         
@@ -132,12 +126,12 @@ class AppHeader(QWidget):
         time_col.addWidget(time_lbl)
         
         top_h_layout.addLayout(time_col)
-        top_h_layout.addStretch() # Pendorong
+        top_h_layout.addStretch() 
         
-        # B. Weather Widget (Diletakkan di kanan, sejajar dengan waktu)
+        # Weather Widget 
         weather_frame = QFrame()
         weather_frame.setObjectName("WeatherWidget")
-        weather_frame.setFixedSize(120, 40) # Ukuran yang lebih kecil
+        weather_frame.setFixedSize(120, 40) 
         w_layout = QHBoxLayout(weather_frame)
         w_layout.setContentsMargins(5, 5, 5, 5)
         
@@ -154,9 +148,9 @@ class AppHeader(QWidget):
         
         main_v_layout.addLayout(top_h_layout)
 
-        # 2. MIDDLE ROW: Title & Subtitle (Langsung di bawah waktu)
+        
         title_v_layout = QVBoxLayout()
-        title_v_layout.setContentsMargins(0, 5, 0, 0) # Mengurangi margin bawah
+        title_v_layout.setContentsMargins(0, 5, 0, 0) 
         title_v_layout.setSpacing(2)
 
         title = QLabel(title_text)
@@ -172,7 +166,7 @@ class AppHeader(QWidget):
 
         main_v_layout.addLayout(title_v_layout)
 
-# --- CLASS PLANT CARD (Diintegrasikan ke HomeScreen.py) ---
+# Plant Card
 class PlantCard(QFrame):
     def __init__(self, name, sci_name, stats, action_text=None, warning=None):
         super().__init__()
@@ -220,7 +214,6 @@ class PlantCard(QFrame):
             
         self.setLayout(layout)
 
-# --- CLASS ADD PLANT CARD (Diintegrasikan ke HomeScreen.py) ---
 class AddPlantCard(QFrame):
     clicked = pyqtSignal()
 
@@ -228,7 +221,7 @@ class AddPlantCard(QFrame):
         super().__init__()
         self.setObjectName("AddCard")
         self.setFixedSize(280, 320)
-        self.setCursor(Qt.PointingHandCursor) # Ubah kursor jadi tangan agar terlihat bisa diklik
+        self.setCursor(Qt.PointingHandCursor) 
         
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignCenter)
@@ -249,28 +242,23 @@ class AddPlantCard(QFrame):
         self.clicked.emit()
         super().mousePressEvent(event)
 
-# --- HOME PAGE CONTENT (Dikembalikan ke content semula) ---
-print("DEBUG IMPORT: Lokasi PlantManager ->", PlantManager)
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
         
-        # --- 1. Inisialisasi Manager ---
         self.plant_manager = PlantManager()
-        # Pastikan ada user ID dummy atau dari login
-        # Di sini saya hardcode "user123" untuk contoh
+        
+        # ID Dummy
         self.current_user_id = "user123" 
-        # Load data awal dari DB ke memory
+
         self.plant_manager.loadUserData(self.current_user_id) 
 
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(30, 30, 30, 30)
         self.main_layout.setSpacing(10)
         
-        # Header
         self.main_layout.addWidget(AppHeader("My Garden", "Monitor and manage your plants' health"))
         
-        # --- 2. Area Scroll & Grid ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -283,7 +271,6 @@ class HomePage(QWidget):
         self.scroll.setWidget(self.content_widget)
         self.main_layout.addWidget(self.scroll)
 
-        # --- 3. Render Awal ---
         self.refresh_plant_list()
 
     def refresh_plant_list(self):
@@ -292,42 +279,34 @@ class HomePage(QWidget):
         print(f"ID Objek PlantManager: {id(self.plant_manager)}")
         print(f"Isi plantList: {self.plant_manager.plantList}")
         
-        # 1. HAPUS SEMUA WIDGET LAMA DARI GRID
-        # Kita loop terbalik untuk menghapus dengan aman
         for i in reversed(range(self.grid.count())): 
             widget = self.grid.itemAt(i).widget()
             if widget is not None: 
-                widget.setParent(None) # Lepaskan dari layout
-                widget.deleteLater()   # Hapus dari memori
+                widget.setParent(None) 
+                widget.deleteLater()   
 
-        # 2. TAMBAHKAN KARTU 'ADD PLANT' (Selalu di posisi Baris 0, Kolom 0)
         add_card = AddPlantCard()
         add_card.clicked.connect(self.open_add_plant_form)
         self.grid.addWidget(add_card, 0, 0)
 
-        # 3. AMBIL DATA DARI MANAGER
-        # Pastikan PlantManager punya atribut plantList yang berisi Objek Plant
+        # Ambil Data dari manager
         plants = self.plant_manager.plantList 
 
-        print(f"Debug: Menampilkan {len(plants)} tanaman.") # Cek di terminal
+        print(f"Debug: Menampilkan {len(plants)} tanaman.") 
 
-        # 4. LOOPING UNTUK MENAMPILKAN KARTU TANAMAN
+        # Loop buat nampilin tanaman
         row = 0
-        col = 1 # Mulai dari kolom 1 karena kolom 0 sudah dipakai AddCard
-        max_cols = 3 # Misal 3 kolom per baris (sesuaikan lebar layar)
+        col = 1 # Col 1 karena col 0 buat add plant
+        max_cols = 3 
 
         for plant in plants:
-            # Ambil data dari OBJEK Plant (gunakan Getter)
-            # Pastikan objek plant punya metode ini
             p_name = plant.getPlantName()
             p_species = plant.getPlantSpecies()
             p_media = plant.getPlantMedia()
-            p_sun = "Sun" # Atau plant.getSunlight() jika ada
+            p_sun = "Sun" 
 
-            # Siapkan data stats untuk kartu
             stats = {"🌱": p_media, "☀️": p_sun}
-
-            # Buat Kartu
+            
             card = PlantCard(
                 name=p_name,
                 sci_name=p_species,
@@ -335,20 +314,12 @@ class HomePage(QWidget):
                 action_text="Details" 
             )
             
-            # Masukkan ke Grid
             self.grid.addWidget(card, row, col)
 
-            # 5. HITUNG POSISI BERIKUTNYA
             col += 1
             if col >= max_cols:
-                col = 0      # Reset ke kolom pertama
-                row += 1     # Pindah ke baris baru
-            
-            # PENTING: Jika baris baru dimulai (row > 0),
-            # jangan biarkan AddCard tertimpa jika kita kembali ke (0,0).
-            # Tapi logika di atas (0,0) hanya untuk AddCard. 
-            # Jika row > 0, col 0 aman digunakan untuk tanaman.
-            # Jika row == 0, col 0 JANGAN digunakan (skip ke 1).
+                col = 0      
+                row += 1     
             
             if row == 0 and col == 0:
                 col = 1
@@ -358,31 +329,21 @@ class HomePage(QWidget):
         form = AddPlantForm(self)
         
         if form.exec_() == QDialog.Accepted:
-            # 1. Ambil data dictionary dari form
             data = form.get_data()
             
-            # 2. Lengkapi data yang kurang (PENTING UNTUK CONTROLLER)
-            # Controller butuh userID dan plantID untuk membuat Objek
             data['userID'] = self.current_user_id
-            
-            # Generate ID Sederhana (atau biarkan Controller handle UUID)
-            # Agar tidak error di constructor Plant
             import time
             data['plantID'] = f"P{int(time.time())}" 
-            data['date'] = "2025-01-01" # Default date string jika form tidak kirim
+            data['date'] = "2025-01-01" 
             
             print("Debug: Mengirim data ke Manager:", data)
 
-            # 3. Panggil Controller
-            # Pastikan di PlantManager.py nama metodenya benar (onAddClick atau addNewPlant)
             self.plant_manager.onAddClick(data) 
-            
-            # 4. Refresh UI
             self.refresh_plant_list()
             
             QMessageBox.information(self, "Success", f"Tanaman '{data['name']}' berhasil ditambahkan!")
 
-# --- MAIN WINDOW (Logika Navigasi) ---
+# Main Window
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -402,17 +363,16 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         main_layout.addWidget(self.pages)
         
-        # Inisialisasi Halaman
+        # inisiasi halaman home
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path="app.db") 
         self.todo_page = QWidget() 
         self.settings_page = QWidget() 
 
-        # Tambahkan ke Stacked Widget
-        self.pages.addWidget(self.home_page)      # index 0 (Home)
-        self.pages.addWidget(self.community_page) # index 1 (Community)
-        self.pages.addWidget(self.todo_page)      # index 2 (Todo)
-        self.pages.addWidget(self.settings_page)  # index 3 (Settings)
+        self.pages.addWidget(self.home_page)      # indeks 0 
+        self.pages.addWidget(self.community_page) # indeks 1 
+        self.pages.addWidget(self.todo_page)      # indeks 2 
+        self.pages.addWidget(self.settings_page)  # indeks 3 
 
         self.nav_buttons = self.sidebar.get_nav_buttons()
         self.nav_mapping = {
@@ -425,7 +385,6 @@ class MainWindow(QMainWindow):
         for btn, index in self.nav_mapping.items():
             btn.clicked.connect(lambda checked, i=index, b=btn: self._switch_page_and_update_sidebar(i, b))
 
-        # Set Halaman Awal ke Home
         self.pages.setCurrentIndex(0)
         self.nav_buttons["home"].setChecked(True) 
 
@@ -438,13 +397,11 @@ class MainWindow(QMainWindow):
             else:
                 btn.setChecked(False)
         
-        # Panggil reload_list jika Community yang aktif
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
 
 
 if __name__ == "__main__":
-    # Setup DB Awal
     try:
         conn = sqlite3.connect("app.db")
         Post.create_table(conn)

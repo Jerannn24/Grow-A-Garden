@@ -3,9 +3,6 @@ import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton
 from PyQt5.QtCore import Qt, QDateTime
 
-# ============================================
-# PATH CONFIGURATION
-# ============================================
 THIS_FILE = os.path.abspath(__file__)
 VIEWS_DIR = os.path.dirname(THIS_FILE)
 SRC_DIR = os.path.dirname(VIEWS_DIR)
@@ -13,28 +10,8 @@ SRC_DIR = os.path.dirname(VIEWS_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-# ============================================
-# IMPORTS
-# ============================================
-try:
-    from controllers.PostManager import PostManager
-except ImportError as e:
-    print(f"❌ Import Error in DisplayCommunity: {e}")
-    print(f"   SRC_DIR: {SRC_DIR}")
-    print(f"   sys.path: {sys.path}")
-    
-    # Dummy fallback
-    from PyQt5.QtWidgets import QLabel
-    class PostManager(QWidget):
-        def __init__(self, db_path, parent=None):
-            super().__init__(parent)
-            self.setLayout(QVBoxLayout())
-            self.layout().addWidget(QLabel(f"PostManager Load Failed\nError: {e}"))
-        
-        def reload_list(self, order_by="timeCreated"):
-            pass
+from controllers.PostManager import PostManager
 
-# --- 1. COMMUNITY HEADER ---
 class CommunityHeader(QWidget):
     def __init__(self):
         super().__init__()
@@ -44,7 +21,7 @@ class CommunityHeader(QWidget):
         main_h_layout.setContentsMargins(0, 0, 0, 0) 
         main_h_layout.setSpacing(10)
 
-        # A. TIME COLUMN
+        # TIME COLUMN
         time_col = QVBoxLayout()
         time_col.setContentsMargins(0, 0, 0, 0)
         time_col.setSpacing(2)
@@ -62,7 +39,7 @@ class CommunityHeader(QWidget):
         main_h_layout.addLayout(time_col)
         main_h_layout.addStretch()
 
-        # B. INFO BOXES
+        # INFO
         def create_info_box(icon, main_text, sub_text=None, location=None):
             frame = QFrame()
             frame.setStyleSheet("background-color: white; border-radius: 8px; padding: 5px 10px; border: 1px solid #ddd;")
@@ -102,7 +79,7 @@ class CommunityHeader(QWidget):
         main_h_layout.addWidget(create_info_box("📍", "Jakarta, Indonesia"))
 
 
-# --- 2. SHARE POST WIDGET ---
+# Share Post
 class SharePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
         super().__init__(parent)
@@ -124,7 +101,6 @@ class SharePostWidget(QWidget):
         frame_layout.setContentsMargins(15, 15, 15, 15)
         frame_layout.setSpacing(12)
         
-        # Avatar kecil
         avatar_lbl = QLabel("🌱")
         avatar_lbl.setFixedSize(40, 40)
         avatar_lbl.setAlignment(Qt.AlignCenter)
@@ -134,12 +110,11 @@ class SharePostWidget(QWidget):
             font-size: 18px;
         """)
         
-        # Placeholder text
+        # Placeholder Buat Post 
         self.input_label = QLabel("Share your gardening moment...")
         self.input_label.setCursor(Qt.PointingHandCursor)
         self.input_label.setStyleSheet("font-size: 15px; color: gray; padding: 8px 12px; background-color: #F5F5F5; border-radius: 20px; border: none;")
 
-        # Button Add Post
         self.post_button = QPushButton("Add Post")
         self.post_button.setFixedSize(110, 35)
         self.post_button.setStyleSheet("""
@@ -158,7 +133,6 @@ class SharePostWidget(QWidget):
         """)
         self.post_button.clicked.connect(self._open_create_post)
 
-        # Layouting
         frame_layout.addWidget(avatar_lbl)
         frame_layout.addWidget(self.input_label)
         frame_layout.addStretch()
@@ -170,12 +144,11 @@ class SharePostWidget(QWidget):
         if hasattr(self.post_manager, 'switch_to_create_post'):
             self.post_manager.switch_to_create_post()
 
-# --- 3. DISPLAY COMMUNITY (MAIN CLASS) ---
+# Tampilan Community
 class DisplayCommunity(QWidget):
     def __init__(self, db_path: str = "app.db", parent=None):
         super().__init__(parent)
         
-        # Pastikan db_path adalah absolute path
         if not os.path.isabs(db_path):
             db_path = os.path.join(SRC_DIR, db_path)
         
@@ -185,11 +158,9 @@ class DisplayCommunity(QWidget):
         layout.setContentsMargins(30, 30, 30, 30) 
         layout.setSpacing(20)
 
-        # 1. Header
         header_widget = CommunityHeader()
         layout.addWidget(header_widget) 
 
-        # 2. Title Section
         title_container = QWidget()
         title_layout = QVBoxLayout(title_container)
         title_layout.setContentsMargins(0, 0, 0, 0)
@@ -202,19 +173,19 @@ class DisplayCommunity(QWidget):
         
         layout.addWidget(title_container)
         
-        # 3. Share Post Widget
+        # Share Post Widget
         self.post_manager = PostManager(db_path=db_path)
         share_post_widget = SharePostWidget(post_manager=self.post_manager)
         layout.addWidget(share_post_widget)
         
-        # 4. Tab Navigation
+        # Tab Navigation
         tab_layout = QHBoxLayout()
         
         self.btn_recent = self._create_tab_button("Recent", is_active=True)
         self.btn_likes = self._create_tab_button("Top Likes")
         self.btn_views = self._create_tab_button("Top Views")
         
-        # Connect tabs to PostManager
+        # Menghubungkan tab ke PostManager
         self.btn_recent.clicked.connect(lambda: self.post_manager.reload_list("timeCreated"))
         self.btn_likes.clicked.connect(lambda: self.post_manager.reload_list("likes"))
         self.btn_views.clicked.connect(lambda: self.post_manager.reload_list("views"))
@@ -226,7 +197,6 @@ class DisplayCommunity(QWidget):
         
         layout.addLayout(tab_layout)
 
-        # 5. PostManager Content (Feed)
         layout.addWidget(self.post_manager)
         
         layout.addStretch()
