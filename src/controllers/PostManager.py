@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget,
                              QListWidgetItem, QApplication, QLabel, QPushButton, 
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtGui import QIcon
 
 # path
 THIS_FILE = os.path.abspath(__file__)
@@ -15,9 +16,24 @@ SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from views.DisplayPost import DisplayPost
-from models.Post import Post
-from models.UserModel import UserModel
+try:
+    from views.DisplayPost import DisplayPost
+except ImportError:
+    class DisplayPost(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setLayout(QVBoxLayout())
+            self.layout().addWidget(QLabel("DisplayPost tidak ditemukan"))
+
+        def render_post(self, post, replies_count=0):
+            pass
+        
+try:
+    from models.Post import Post
+    from models.UserModel import UserModel
+except ImportError:
+    print("ERROR: models.Post atau model.UserModel tidak dapat diimport")
+    sys.exit(1)
 
 class CreatePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
