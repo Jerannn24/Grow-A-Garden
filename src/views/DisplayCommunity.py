@@ -2,6 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton
 from PyQt5.QtCore import Qt, QDateTime
+from models.UserModel import DB_FILE_PATH
 
 THIS_FILE = os.path.abspath(__file__)
 VIEWS_DIR = os.path.dirname(THIS_FILE)
@@ -146,7 +147,7 @@ class SharePostWidget(QWidget):
 
 # Tampilan Community
 class DisplayCommunity(QWidget):
-    def __init__(self, db_path: str = "app.db", parent=None):
+    def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         
         if not os.path.isabs(db_path):

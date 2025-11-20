@@ -56,6 +56,7 @@ class PlantManager:
             try:
                 new_plant.addNewPlant()
                 print("Manager: Berhasil simpan ke DB.")
+                
             except Exception as db_error:
                 print(f"Manager DB ERROR: {db_error}")
                 # Jika DB gagal, kita throw error agar tidak lanjut ke append

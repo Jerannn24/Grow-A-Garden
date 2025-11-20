@@ -9,7 +9,8 @@ from PyQt5.QtCore import Qt, QByteArray, pyqtSignal
 
 
 class LoginForm(QWidget):
-    switchToRegisterRequested = pyqtSignal() 
+    switchToRegisterRequested = pyqtSignal()
+    switchToHomeScreen = pyqtSignal() 
     loginRequested = pyqtSignal(str, str)
     errorDisplay = pyqtSignal(str)
     def __init__(self):
