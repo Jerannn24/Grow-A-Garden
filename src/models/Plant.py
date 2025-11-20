@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 
 class Plant:
-    DB_NAME = "garden.db"
+    DB_NAME = "app.db"
 
     def __init__(self, userID, plantID, plantName, plantSpecies, 
                  plantingStartDate, plantMedia=None, wateringFrequency=None, 

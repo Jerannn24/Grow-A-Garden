@@ -177,7 +177,7 @@ class PlantCard(QFrame):
     def __init__(self, name, sci_name, stats, action_text=None, warning=None):
         super().__init__()
         self.setProperty("class", "plant-card")
-        self.setStyleSheet("background-color: white; border-radius: 12px; border: 1px solid #E0E0E0;")
+        self.setStyleSheet("background-color: white; border-radius: 12px;")
         self.setFixedSize(280, 320)
         
         layout = QVBoxLayout()
@@ -322,7 +322,7 @@ class HomePage(QWidget):
             p_name = plant.getPlantName()
             p_species = plant.getPlantSpecies()
             p_media = plant.getPlantMedia()
-            p_sun = "Sun" # Atau plant.getSunlight() jika ada
+            p_sun = plant.getLightingDuration() # Atau plant.getSunlight() jika ada
 
             # Siapkan data stats untuk kartu
             stats = {"🌱": p_media, "☀️": p_sun}
