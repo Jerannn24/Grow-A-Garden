@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QPushButton, QFrame, 
                              QGridLayout, QScrollArea, QSizePolicy, QStackedWidget)
@@ -6,27 +7,49 @@ from PyQt5.QtCore import Qt, QSize, QDateTime
 from PyQt5.QtGui import QFont, QColor
 import sqlite3
 
-# Import DisplayCommunity dari file terpisah (asumsi file ini ada dan mengandung DisplayCommunity)
-try:
-    from src.views.DisplayCommunity import DisplayCommunity 
-    from src.models.Post import Post 
-except ImportError:
-    print("Warning: Using local import fallback for DisplayCommunity and Post.")
-    try:
-        from DisplayCommunity import DisplayCommunity
-        from Post import Post
-    except ImportError:
-        # Dummy classes jika import gagal
-        class DisplayCommunity(QWidget):
-            def __init__(self, db_path, parent=None):
-                super().__init__(parent)
-                self.setLayout(QVBoxLayout())
-                self.layout().addWidget(QLabel("Community View Load Failed"))
-        class Post:
-            @staticmethod
-            def create_table(conn): pass
+# ============================================
+# PATH CONFIGURATION - SOLUSI UTAMA
+# ============================================
+# Dapatkan path absolut dari file ini
+THIS_FILE = os.path.abspath(__file__)  # /path/to/src/views/HomeScreen.py
+VIEWS_DIR = os.path.dirname(THIS_FILE)  # /path/to/src/views
+SRC_DIR = os.path.dirname(VIEWS_DIR)    # /path/to/src
+PROJECT_ROOT = os.path.dirname(SRC_DIR) # /path/to/project
 
-# --- KONFIGURASI WARNA & STYLE (TETAP SAMA) ---
+# Tambahkan src ke sys.path jika belum ada
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+# Database path - SELALU di dalam folder src
+DB_PATH = os.path.join(SRC_DIR, "app.db")
+
+# ============================================
+# IMPORTS WITH ERROR HANDLING
+# ============================================
+try:
+    from views.DisplayCommunity import DisplayCommunity
+    from models.Post import Post
+except ImportError as e:
+    print(f"Import Error: {e}")
+    print(f"sys.path: {sys.path}")
+    print(f"SRC_DIR: {SRC_DIR}")
+    
+    # Fallback dummy classes
+    class DisplayCommunity(QWidget):
+        def __init__(self, db_path, parent=None):
+            super().__init__(parent)
+            layout = QVBoxLayout(self)
+            error_label = QLabel(f"❌ Community View Load Failed\n\nError: {e}\n\nPastikan semua file ada di:\n{SRC_DIR}")
+            error_label.setStyleSheet("color: red; padding: 20px;")
+            error_label.setWordWrap(True)
+            layout.addWidget(error_label)
+
+    class Post:
+        @staticmethod
+        def create_table(conn):
+            return None
+
+# --- STYLE SHEET (TETAP SAMA) ---
 STYLE_SHEET = """
     QMainWindow { background-color: #F8F9FA; }
     
@@ -50,17 +73,15 @@ STYLE_SHEET = """
         font-weight: bold;
     }
     
-    /* Main Content Styling */
     QLabel#SectionTitle { font-size: 22px; font-weight: bold; color: #004d00; }
     QLabel#SubTitle { font-size: 12px; color: gray; }
     
-    /* Plant Cards */
     QFrame.plant-card { background-color: white; border-radius: 12px; border: 1px solid #E0E0E0; }
     QFrame#WeatherWidget { background-color: #F8F9FA; border-radius: 10px; border: 1px solid #E0E0E0; }
     QFrame#AddCard { background-color: #F5F5F5; border: 2px dashed #BDBDBD; border-radius: 12px; }
 """
 
-# --- SIDEBAR (Tetap sama) ---
+# --- SIDEBAR ---
 class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -106,44 +127,40 @@ class Sidebar(QFrame):
     def get_nav_buttons(self):
         return self._buttons
 
-# --- CLASS HEADER (Diintegrasikan ke HomeScreen.py) ---
-# Di dalam HomeScreen.py
-
+# --- APP HEADER ---
 class AppHeader(QWidget):
     def __init__(self, title_text: str, subtitle_text: str = None):
         super().__init__()
         self.setStyleSheet("background-color: #F8F9FA;")
         
-        # Main Vertical Layout (menampung semua baris)
         main_v_layout = QVBoxLayout(self)
         main_v_layout.setContentsMargins(0, 0, 0, 0)
-        main_v_layout.setSpacing(5) # Spacing vertikal yang lebih sedikit
+        main_v_layout.setSpacing(5)
 
-        # 1. TOP ROW: Time/Date & Weather (Baris ini harus sejajar)
+        # TOP ROW
         top_h_layout = QHBoxLayout()
-        top_h_layout.setSpacing(20) # Spacing antara waktu dan cuaca
+        top_h_layout.setSpacing(20)
         
-        # A. Time/Date Column
+        # Time/Date Column
         time_col = QVBoxLayout()
         time_col.setContentsMargins(0, 0, 0, 0)
         time_col.setSpacing(2)
         
         date_lbl = QLabel(QDateTime.currentDateTime().toString("dddd, MMMM dd, yyyy"))
         date_lbl.setStyleSheet("color: gray; font-size: 14px;")
-        # Menggunakan waktu hardcoded dari gambar Anda untuk konsistensi visual
-        time_lbl = QLabel("07:44:14 PM") 
+        time_lbl = QLabel(QDateTime.currentDateTime().toString("hh:mm:ss AP"))
         time_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #007F00;")
         
         time_col.addWidget(date_lbl)
         time_col.addWidget(time_lbl)
         
         top_h_layout.addLayout(time_col)
-        top_h_layout.addStretch() # Pendorong
+        top_h_layout.addStretch()
         
-        # B. Weather Widget (Diletakkan di kanan, sejajar dengan waktu)
+        # Weather Widget
         weather_frame = QFrame()
         weather_frame.setObjectName("WeatherWidget")
-        weather_frame.setFixedSize(120, 40) # Ukuran yang lebih kecil
+        weather_frame.setFixedSize(120, 40)
         w_layout = QHBoxLayout(weather_frame)
         w_layout.setContentsMargins(5, 5, 5, 5)
         
@@ -157,12 +174,11 @@ class AppHeader(QWidget):
         w_layout.addStretch()
         
         top_h_layout.addWidget(weather_frame)
-        
         main_v_layout.addLayout(top_h_layout)
 
-        # 2. MIDDLE ROW: Title & Subtitle (Langsung di bawah waktu)
+        # TITLE ROW
         title_v_layout = QVBoxLayout()
-        title_v_layout.setContentsMargins(0, 5, 0, 0) # Mengurangi margin bawah
+        title_v_layout.setContentsMargins(0, 5, 0, 0)
         title_v_layout.setSpacing(2)
 
         title = QLabel(title_text)
@@ -178,7 +194,7 @@ class AppHeader(QWidget):
 
         main_v_layout.addLayout(title_v_layout)
 
-# --- CLASS PLANT CARD (Diintegrasikan ke HomeScreen.py) ---
+# --- PLANT CARD ---
 class PlantCard(QFrame):
     def __init__(self, name, sci_name, stats, action_text=None, warning=None):
         super().__init__()
@@ -226,7 +242,7 @@ class PlantCard(QFrame):
             
         self.setLayout(layout)
 
-# --- CLASS ADD PLANT CARD (Diintegrasikan ke HomeScreen.py) ---
+# --- ADD PLANT CARD ---
 class AddPlantCard(QFrame):
     def __init__(self):
         super().__init__()
@@ -248,7 +264,7 @@ class AddPlantCard(QFrame):
         layout.addWidget(text)
         self.setLayout(layout)
 
-# --- HOME PAGE CONTENT (Dikembalikan ke content semula) ---
+# --- HOME PAGE ---
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
@@ -256,10 +272,8 @@ class HomePage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(10)
         
-        # 1. Header (Waktu + Weather + Title)
         layout.addWidget(AppHeader("My Garden", "Monitor and manage your plants' health"))
         
-        # 2. Plant Cards (Masuk ke Scroll Area)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
@@ -269,7 +283,6 @@ class HomePage(QWidget):
         grid.setSpacing(20)
         grid.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         
-        # -- ADD CARDS (KONTEN YANG DIKEMBALIKAN) --
         grid.addWidget(AddPlantCard(), 0, 0)
         
         c1 = PlantCard("Monstera Deliciosa", "Monstera deliciosa", 
@@ -289,7 +302,7 @@ class HomePage(QWidget):
         scroll.setWidget(content_widget)
         layout.addWidget(scroll)
 
-# --- MAIN WINDOW (Logika Navigasi) ---
+# --- MAIN WINDOW ---
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -309,17 +322,16 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         main_layout.addWidget(self.pages)
         
-        # Inisialisasi Halaman
+        # Inisialisasi Halaman dengan DB_PATH yang benar
         self.home_page = HomePage()
-        self.community_page = DisplayCommunity(db_path="app.db") 
+        self.community_page = DisplayCommunity(db_path=DB_PATH)  # <-- GUNAKAN DB_PATH
         self.todo_page = QWidget() 
         self.settings_page = QWidget() 
 
-        # Tambahkan ke Stacked Widget
-        self.pages.addWidget(self.home_page)      # index 0 (Home)
-        self.pages.addWidget(self.community_page) # index 1 (Community)
-        self.pages.addWidget(self.todo_page)      # index 2 (Todo)
-        self.pages.addWidget(self.settings_page)  # index 3 (Settings)
+        self.pages.addWidget(self.home_page)      
+        self.pages.addWidget(self.community_page) 
+        self.pages.addWidget(self.todo_page)      
+        self.pages.addWidget(self.settings_page)  
 
         self.nav_buttons = self.sidebar.get_nav_buttons()
         self.nav_mapping = {
@@ -332,7 +344,6 @@ class MainWindow(QMainWindow):
         for btn, index in self.nav_mapping.items():
             btn.clicked.connect(lambda checked, i=index, b=btn: self._switch_page_and_update_sidebar(i, b))
 
-        # Set Halaman Awal ke Home
         self.pages.setCurrentIndex(0)
         self.nav_buttons["home"].setChecked(True) 
 
@@ -345,19 +356,23 @@ class MainWindow(QMainWindow):
             else:
                 btn.setChecked(False)
         
-        # Panggil reload_list jika Community yang aktif
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
 
 
 if __name__ == "__main__":
-    # Setup DB Awal
+    # Setup DB dengan path yang benar
+    print(f"🗄️  Database location: {DB_PATH}")
+    print(f"📁 Running from: {os.getcwd()}")
+    print(f"📂 SRC_DIR: {SRC_DIR}")
+    
     try:
-        conn = sqlite3.connect("app.db")
+        conn = sqlite3.connect(DB_PATH)
         Post.create_table(conn)
         conn.close()
+        print("✅ Database initialized successfully")
     except Exception as e:
-        print(f"Error initializing database table: {e}")
+        print(f"❌ Error initializing database: {e}")
 
     app = QApplication(sys.argv)
     app.setStyleSheet(STYLE_SHEET) 

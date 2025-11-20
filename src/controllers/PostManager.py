@@ -2,50 +2,53 @@ import sqlite3
 import sys
 import os
 from typing import Optional, List, Any
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QListWidget, QListWidgetItem, QInputDialog, QApplication, QLabel, QPushButton, QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget, 
+                             QListWidgetItem, QApplication, QLabel, QPushButton, 
+                             QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QDateTime
-from PyQt5.QtGui import QIcon
 
-# pastikan 'src' dan project root ada di sys.path supaya import package-style atau module-level keduanya bekerja
-_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-_src_dir = os.path.join(_project_root, 'src')
-for p in (_src_dir, _project_root):
-    if p and p not in sys.path:
-        sys.path.insert(0, p)
+# ============================================
+# PATH CONFIGURATION
+# ============================================
+THIS_FILE = os.path.abspath(__file__)
+CONTROLLERS_DIR = os.path.dirname(THIS_FILE)
+SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
 
-# Coba import package-qualified lalu fallback ke modul-level import
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+# ============================================
+# IMPORTS
+# ============================================
 try:
-    from src.views.DisplayPost import DisplayPost
-except Exception:
-    # Asumsi DisplayPost.py sudah tersedia di folder yang sama untuk uji coba
-    try:
-        from views.DisplayPost import DisplayPost
-    except ImportError:
-        # Jika DisplayPost tidak ada, buat dummy class untuk kompilasi
-        class DisplayPost(QWidget):
-            def render_post(self, post, replies_count=0):
-                self.setLayout(QVBoxLayout())
-                self.layout().addWidget(QLabel(f"Detail Post ID {post.getPostID()}"))
-
+    from views.DisplayPost import DisplayPost
+except ImportError:
+    class DisplayPost(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setLayout(QVBoxLayout())
+            self.layout().addWidget(QLabel("DisplayPost tidak ditemukan"))
+        
+        def render_post(self, post, replies_count=0):
+            pass
 
 try:
-    from src.models.Post import Post
-except Exception:
     from models.Post import Post
+except ImportError:
+    print("ERROR: models.Post tidak dapat diimport")
+    sys.exit(1)
 
-# --- NEW: CreatePostWidget Class (untuk input post baru) ---
+# --- CREATE POST WIDGET ---
 class CreatePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
         super().__init__(parent)
         self.post_manager = post_manager
-        self.selected_media_path: str = "" # Variable untuk menyimpan path gambar sementara
+        self.selected_media_path: str = ""
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
-
-        # ... (Title dan Input Title tetap sama) ...
         
         # Title
         lbl_title = QLabel("📝 Buat Post Baru")
@@ -68,7 +71,7 @@ class CreatePostWidget(QWidget):
         self.media_status_lbl = QLabel("Tidak ada gambar dipilih.")
         self.media_status_lbl.setStyleSheet("color: #007F00; font-style: italic; margin-top: 5px;")
         
-        # --- Tambahkan Tombol Gambar (Sesuai Permintaan) ---
+        # Media Button
         media_action_layout = QHBoxLayout()
         self.btn_add_media = QPushButton("🖼️ Tambah Gambar")
         self.btn_add_media.setStyleSheet("""
@@ -86,15 +89,36 @@ class CreatePostWidget(QWidget):
         media_action_layout.addStretch(1)
         layout.addLayout(media_action_layout)
 
-
-        # Action Buttons (Batal/Posting)
+        # Action Buttons
         btn_layout = QHBoxLayout()
         self.cancel_button = QPushButton("Batal")
-        # ... (Styling Batal) ...
-        self.cancel_button.clicked.connect(self.cancel_post) # Ubah connect ke cancel_post
+        self.cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #F5F5F5;
+                color: #666;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #E0E0E0;
+            }
+        """)
+        self.cancel_button.clicked.connect(self.cancel_post)
         
         self.submit_button = QPushButton("Posting")
-        # ... (Styling Posting) ...
+        self.submit_button.setStyleSheet("""
+            QPushButton {
+                background-color: #007F00;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #006600;
+            }
+        """)
         self.submit_button.clicked.connect(self.submit_post)
         
         btn_layout.addWidget(self.cancel_button)
@@ -103,12 +127,12 @@ class CreatePostWidget(QWidget):
         layout.addLayout(btn_layout)
 
     def select_media_file(self):
-        """Membuka dialog untuk memilih file gambar dan menyimpan path."""
-        # QFileDialog memerlukan import QFileDialog
         options = QFileDialog.Options()
-        # Filter hanya file gambar
-        file_name, _ = QFileDialog.getOpenFileName(self, "Pilih Gambar", "",
-                                                   "Gambar Files (*.png *.jpg *.jpeg *.gif);;Semua Files (*)", options=options)
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Pilih Gambar", "",
+            "Gambar Files (*.png *.jpg *.jpeg *.gif);;Semua Files (*)", 
+            options=options
+        )
         
         if file_name:
             self.selected_media_path = file_name
@@ -119,7 +143,6 @@ class CreatePostWidget(QWidget):
             self.media_status_lbl.setText("Tidak ada gambar dipilih.")
 
     def cancel_post(self):
-        """Membersihkan form dan kembali ke feed."""
         self.title_input.clear()
         self.content_input.clear()
         self.selected_media_path = ""
@@ -136,24 +159,29 @@ class CreatePostWidget(QWidget):
 
         time_created = QDateTime.currentDateTime().toString(Qt.ISODate)
 
-        # KUNCI: MENGIRIMKAN PATH MEDIA KE ENTITAS POST
-        new_post = Post(userID=1, 
-                        title=title, 
-                        content=content, 
-                        media=self.selected_media_path, # <-- Tambahkan path media di sini
-                        timeCreated=time_created)
+        new_post = Post(
+            userID=1, 
+            title=title, 
+            content=content, 
+            media=self.selected_media_path,
+            timeCreated=time_created
+        )
         
         try:
             new_post.createPost(self.post_manager.conn)
             QMessageBox.information(self, "Sukses", "Post berhasil dibuat!")
-            self.cancel_post() # Gunakan cancel_post untuk membersihkan form
+            self.cancel_post()
         except Exception as e:
             QMessageBox.critical(self, "Error DB", f"Gagal membuat post: {e}")
 
-# --- PostManager Class (Modifikasi) ---
+# --- POST MANAGER ---
 class PostManager(QWidget):
     def __init__(self, db_path: str = "app.db", parent=None):
         super().__init__(parent)
+        
+        # Pastikan db_path adalah absolute path
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(SRC_DIR, db_path)
         
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
@@ -162,87 +190,77 @@ class PostManager(QWidget):
         # UI Setup
         self.stackWidget = QStackedWidget()
         
-        # Main Layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0) # Hapus margin karena akan ditambahkan di DisplayCommunity
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.stackWidget)
 
-        # --- A. FEED LIST PAGE ---
+        # --- FEED PAGE ---
         self.feed_page = QWidget()
         feed_layout = QVBoxLayout(self.feed_page)
         feed_layout.setContentsMargins(0, 0, 0, 0)
         
-        # List Widget untuk Post
-        # List Widget untuk Post (Ini adalah konten utama)
         self.list_widget = QListWidget()
-        # ... (Styling list_widget tetap sama) ...
+        self.list_widget.setStyleSheet("""
+            QListWidget {
+                border: none;
+                background-color: transparent;
+            }
+            QListWidget::item {
+                background-color: white;
+                border-radius: 10px;
+                padding: 15px;
+                margin: 5px 0;
+                border: 1px solid #E0E0E0;
+            }
+            QListWidget::item:hover {
+                background-color: #F5F5F5;
+            }
+        """)
         self.list_widget.itemClicked.connect(self._on_item_clicked)
         feed_layout.addWidget(self.list_widget)
         
-        # Message for no posts
         self.no_post_label = QLabel("Belum ada post di community.\nJadilah yang pertama untuk berbagi!")
         self.no_post_label.setAlignment(Qt.AlignCenter)
         self.no_post_label.setStyleSheet("font-size: 18px; color: #666; padding: 50px;")
         feed_layout.addWidget(self.no_post_label)
         
-        self.stackWidget.addWidget(self.feed_page) # Index 0
+        self.stackWidget.addWidget(self.feed_page)
 
-        # --- B. DETAIL PAGE ---
-        self.detail_view = DisplayPost() 
-        # ... (Pasang sinyal untuk back, like, reply dari detail view ke PostManager) ...
-        self.stackWidget.addWidget(self.detail_view) # Index 1
+        # --- DETAIL PAGE ---
+        self.detail_view = DisplayPost()
+        self.stackWidget.addWidget(self.detail_view)
 
-        # --- C. CREATE POST PAGE ---
+        # --- CREATE POST PAGE ---
         self.create_post_widget = CreatePostWidget(post_manager=self)
-        self.stackWidget.addWidget(self.create_post_widget) # Index 2
+        self.stackWidget.addWidget(self.create_post_widget)
         
-        self.reload_list() # Load post saat inisialisasi
+        self.reload_list()
         
     def _setup_db(self):
         try:
+            print(f"📊 Connecting to database: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
-            # Mengaktifkan pengembalian baris sebagai dict/nama kolom
             self.conn.row_factory = sqlite3.Row
             Post.create_table(self.conn)
         except Exception as e:
-            print(f"Error connecting to database: {e}")
+            print(f"❌ Error connecting to database: {e}")
             self.conn = None
-
-    def _setup_tab_button(self, btn: QPushButton, handler):
-        btn.setCheckable(True)
-        btn.setAutoExclusive(True)
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #EFEFEF; 
-                border: 1px solid #DDD; 
-                border-radius: 15px; 
-                padding: 5px 15px;
-                margin: 5px 5px 15px 0;
-            }
-            QPushButton:checked {
-                background-color: #00A859; 
-                color: white; 
-                font-weight: bold;
-            }
-        """)
-        btn.clicked.connect(handler)
 
     def switch_to_create_post(self):
         self.stackWidget.setCurrentWidget(self.create_post_widget)
 
     def switch_to_feed(self):
         self.stackWidget.setCurrentWidget(self.feed_page)
-        self.reload_list() # Kembali dan refresh list
+        self.reload_list()
 
-    # ----- UI helpers (Modifikasi reload_list) -----
     def reload_list(self, order_by: str = "timeCreated", limit: Optional[int] = 100):
         if self.conn is None:
+            print("⚠️  Koneksi database tidak tersedia")
             return
 
         self.list_widget.clear()
         posts = self._load_posts(order_by=order_by, limit=limit)
         
-        # Logika menampilkan "Belum ada post"
         if not posts:
             self.no_post_label.show()
             self.list_widget.hide()
@@ -251,33 +269,28 @@ class PostManager(QWidget):
             self.list_widget.show()
             
             for p in posts:
-                # Pastikan hanya menampilkan post utama (repliedPostID IS NULL)
                 if p.repliedPostID is not None:
                     continue
 
                 title = p.getTitle() or "(No Title)"
                 content_preview = (p.getContent()[:50] + '...') if len(p.getContent()) > 50 else p.getContent()
                 
-                # Format tampilan di List
-                display_text = f"**{title}**\n{content_preview}\n❤️ {p.getLikeCount()} likes"
+                display_text = f"**{title}**\n{content_preview}\n❤️ {p.getLikeCount()} likes | 👁️ {p.getViewCount()} views"
                 
                 item = QListWidgetItem(display_text)
-                # Simpan postID
                 item.setData(Qt.UserRole, p.getPostID())
                 self.list_widget.addItem(item)
             
-        self.stackWidget.setCurrentIndex(0) # Kembali ke list
-
-    # ... (Sisa metode PostManager tidak berubah) ...
+        self.stackWidget.setCurrentIndex(0)
     
     def _on_item_clicked(self, item: QListWidgetItem):
         post_id = item.data(Qt.UserRole)
         self.show_post(post_id)
 
     def show_post(self, post_id: int):
-        # Implementasi seperti yang diberikan
         post = self._get_post(post_id)
-        if not post: return
+        if not post:
+            return
         self._inc_view(post_id)
         post = self._get_post(post_id)
         replies = post.getTotalComments(self.conn) if hasattr(post, "getTotalComments") else 0
@@ -285,7 +298,8 @@ class PostManager(QWidget):
         self.stackWidget.setCurrentWidget(self.detail_view)
 
     def _get_post(self, post_id: int) -> Optional[Post]:
-        # Implementasi seperti yang diberikan
+        if self.conn is None:
+            return None
         get_by_id = getattr(Post, "get_by_id", None) or getattr(Post, "getByID", None)
         if callable(get_by_id):
             return get_by_id(self.conn, post_id)
@@ -294,7 +308,9 @@ class PostManager(QWidget):
         return Post.fromRowSQL(row) if row else None
 
     def _load_posts(self, order_by: str = "timeCreated", limit: Optional[int] = None) -> List[Post]:
-        # Modifikasi: Tambahkan filter untuk hanya mengambil post utama (bukan reply)
+        if self.conn is None:
+            return []
+        
         mapping = {"timeCreated": "timeCreated", "likes": "likeCount", "views": "viewCount"}
         col = mapping.get(order_by, "timeCreated")
         
