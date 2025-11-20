@@ -10,6 +10,7 @@ from models.UserModel import UserModel
 # Import Views 
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
+from views.HomeScreen import MainWindow
 
 class AccountManager(QWidget):
     def __init__(self):
@@ -39,11 +40,19 @@ class AccountManager(QWidget):
         self.stackWidget.addWidget(self.registerView)
         self.widgets['register'] = self.registerView
 
+        self.homeScreenView = MainWindow()
+        self.stackWidget.addWidget(self.homeScreenView)
+        self.widgets['homescreen'] = self.homeScreenView
+        
+        
+        self.loginView.switchToHomeScreen.connect(lambda: self.switchView('homescreen'))
         self.loginView.switchToRegisterRequested.connect(lambda: self.switchView('register'))
         self.loginView.loginRequested.connect(self.handleLoginRequest)
         
         self.registerView.switchToLoginRequested.connect(lambda: self.switchView('login'))
         self.registerView.registerRequested.connect(self.handleRegisterRequest)
+        
+        self.homeScreenView.logoutRequested.connect(self.handleLogoutRequest) 
 
     
     def handleLoginRequest(self, email, password):        
@@ -53,6 +62,8 @@ class AccountManager(QWidget):
 
         if user_instance:
             self.currentUser = user_instance
+            self.homeScreenView.set_current_user(self.currentUser)
+            self.switchView('homescreen')
             print(f"✅ Login Sukses untuk: {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
                         
         else:
