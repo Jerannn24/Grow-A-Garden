@@ -109,73 +109,66 @@ class SharePostWidget(QWidget):
         self.post_manager = post_manager
         
         frame = QFrame()
-        frame.setStyleSheet("background-color: white; border-radius: 10px; padding: 10px; border: 1px solid #E0E0E0;")
-        
+        frame.setStyleSheet("""
+            background-color: white;
+            border-radius: 8px;
+            border: none;
+            padding: 10px;
+        """)
+
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(frame)
 
-        frame_layout = QVBoxLayout(frame)
+        frame_layout = QHBoxLayout(frame)
         frame_layout.setContentsMargins(15, 15, 15, 15)
+        frame_layout.setSpacing(12)
         
-        # 1. Input Row
-        input_row = QHBoxLayout()
-        input_row.setSpacing(10)
-        
+        # Avatar kecil
         avatar_lbl = QLabel("🌱")
-        avatar_lbl.setFixedSize(30, 30)
+        avatar_lbl.setFixedSize(40, 40)
         avatar_lbl.setAlignment(Qt.AlignCenter)
-        avatar_lbl.setStyleSheet("background-color: #E8F5E9; border-radius: 15px; font-size: 16px;")
+        avatar_lbl.setStyleSheet("""
+            background-color: #E8F5E9; 
+            border-radius: 20px; 
+            font-size: 18px;
+        """)
         
+        # Placeholder text
         self.input_label = QLabel("Share your gardening moment...")
         self.input_label.setCursor(Qt.PointingHandCursor)
-        self.input_label.setStyleSheet("font-size: 14px; color: gray; border: none; padding-left: 10px;")
-        
-        input_row.addWidget(avatar_lbl)
-        input_row.addWidget(self.input_label)
-        input_row.addStretch()
-        
-        frame_layout.addLayout(input_row)
+        self.input_label.setStyleSheet("font-size: 15px; color: gray; padding: 8px 12px; background-color: #F5F5F5; border-radius: 20px; border: none;")
 
-        # 2. Action Row
-        actions_row = QHBoxLayout()
-        actions_row.setContentsMargins(40, 5, 0, 0) 
-        actions_row.setSpacing(10)
-        
-        self.btn_media = QPushButton("🖼️") 
-        self.btn_media.setStyleSheet("background: none; border: none; font-size: 18px; color: #007F00;")
-        self.btn_media.clicked.connect(self._open_create_post) 
-
-        like_icon = QLabel("🤍") 
-        
-        actions_row.addWidget(self.btn_media)
-        actions_row.addWidget(like_icon)
-        actions_row.addStretch()
-        
-        self.post_button = QPushButton("Post")
-        self.post_button.setFixedSize(70, 30)
+        # Button Add Post
+        self.post_button = QPushButton("Add Post")
+        self.post_button.setFixedSize(110, 35)
         self.post_button.setStyleSheet("""
             QPushButton {
-                background-color: #8BC34A;
+                background-color: #66BB6A;
                 color: white; 
-                border-radius: 15px; 
+                border-radius: 17px; 
                 font-weight: bold;
+                font-size: 13px;
+                border : none;
+                padding : 5px 15px;
             }
             QPushButton:hover {
-                background-color: #7CB342;
+                background-color: #57A05A;
             }
         """)
         self.post_button.clicked.connect(self._open_create_post)
-        actions_row.addWidget(self.post_button)
-        
-        frame_layout.addLayout(actions_row)
+
+        # Layouting
+        frame_layout.addWidget(avatar_lbl)
+        frame_layout.addWidget(self.input_label)
+        frame_layout.addStretch()
+        frame_layout.addWidget(self.post_button)
 
         self.input_label.mousePressEvent = lambda event: self._open_create_post()
 
     def _open_create_post(self):
         if hasattr(self.post_manager, 'switch_to_create_post'):
             self.post_manager.switch_to_create_post()
-
 
 # --- 3. DISPLAY COMMUNITY (MAIN CLASS) ---
 class DisplayCommunity(QWidget):
@@ -205,11 +198,7 @@ class DisplayCommunity(QWidget):
         title_lbl = QLabel("Community Feed")
         title_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #333; margin-top: 15px;")
         
-        slogan_lbl = QLabel("Share your gardening journey")
-        slogan_lbl.setStyleSheet("font-size: 14px; color: gray;")
-        
         title_layout.addWidget(title_lbl)
-        title_layout.addWidget(slogan_lbl)
         
         layout.addWidget(title_container)
         
