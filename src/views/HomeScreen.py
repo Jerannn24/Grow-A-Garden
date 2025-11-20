@@ -1,30 +1,24 @@
 import sys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QPushButton, QFrame, 
-                             QGridLayout, QScrollArea, QSizePolicy, QStackedWidget)
-from PyQt5.QtCore import Qt, QSize, QDateTime
+import os
+project_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+if project_root_dir not in sys.path:
+    sys.path.insert(0, project_root_dir)
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, \
+                            QHBoxLayout, QLabel, QPushButton, QFrame, \
+                            QGridLayout, QScrollArea, QSizePolicy, QStackedWidget, \
+                            QMessageBox, QDialog # Tambahkan QDialog
+
+from PyQt5.QtCore import Qt, QSize, QDateTime, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 import sqlite3
 
-# Import DisplayCommunity dari file terpisah (asumsi file ini ada dan mengandung DisplayCommunity)
-try:
-    from src.views.DisplayCommunity import DisplayCommunity 
-    from src.models.Post import Post 
-except ImportError:
-    print("Warning: Using local import fallback for DisplayCommunity and Post.")
-    try:
-        from DisplayCommunity import DisplayCommunity
-        from Post import Post
-    except ImportError:
-        # Dummy classes jika import gagal
-        class DisplayCommunity(QWidget):
-            def __init__(self, db_path, parent=None):
-                super().__init__(parent)
-                self.setLayout(QVBoxLayout())
-                self.layout().addWidget(QLabel("Community View Load Failed"))
-        class Post:
-            @staticmethod
-            def create_table(conn): pass
+from src.views.AddPlantForm import AddPlantForm
+from src.controllers.PlantManager import PlantManager
+from src.views.DisplayCommunity import DisplayCommunity # Jika Anda menggunakan ini
+from src.models.Post import Post                       # Jika Anda menggunakan ini
+from src.controllers.PostManager import PostManager
 
 # --- KONFIGURASI WARNA & STYLE (TETAP SAMA) ---
 STYLE_SHEET = """
@@ -228,10 +222,13 @@ class PlantCard(QFrame):
 
 # --- CLASS ADD PLANT CARD (Diintegrasikan ke HomeScreen.py) ---
 class AddPlantCard(QFrame):
+    clicked = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.setObjectName("AddCard")
         self.setFixedSize(280, 320)
+        self.setCursor(Qt.PointingHandCursor) # Ubah kursor jadi tangan agar terlihat bisa diklik
         
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignCenter)
@@ -248,46 +245,142 @@ class AddPlantCard(QFrame):
         layout.addWidget(text)
         self.setLayout(layout)
 
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
 # --- HOME PAGE CONTENT (Dikembalikan ke content semula) ---
+print("DEBUG IMPORT: Lokasi PlantManager ->", PlantManager)
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(10)
         
-        # 1. Header (Waktu + Weather + Title)
-        layout.addWidget(AppHeader("My Garden", "Monitor and manage your plants' health"))
-        
-        # 2. Plant Cards (Masuk ke Scroll Area)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        
-        content_widget = QWidget()
-        grid = QGridLayout(content_widget)
-        grid.setSpacing(20)
-        grid.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        
-        # -- ADD CARDS (KONTEN YANG DIKEMBALIKAN) --
-        grid.addWidget(AddPlantCard(), 0, 0)
-        
-        c1 = PlantCard("Monstera Deliciosa", "Monstera deliciosa", 
-                        {"💧": "60%", "☀️": "50%"}, action_text="Water today")
-        grid.addWidget(c1, 0, 1)
-        
-        c2 = PlantCard("Golden Pothos", "Epipremnum aureum", 
-                        {"💧": "40%", "☀️": "30%"}, warning="Needs sunlight")
-        grid.addWidget(c2, 0, 2)
-        
-        c3 = PlantCard("Cactus", "Cactaceae", {"💧": "10%", "☀️": "90%"}, action_text="Water in 5 days")
-        grid.addWidget(c3, 1, 0)
+        # --- 1. Inisialisasi Manager ---
+        self.plant_manager = PlantManager()
+        # Pastikan ada user ID dummy atau dari login
+        # Di sini saya hardcode "user123" untuk contoh
+        self.current_user_id = "user123" 
+        # Load data awal dari DB ke memory
+        self.plant_manager.loadUserData(self.current_user_id) 
 
-        c4 = PlantCard("Sunflower", "Helianthus", {"💧": "80%", "☀️": "100%"}, action_text="Water today")
-        grid.addWidget(c4, 1, 1)
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(30, 30, 30, 30)
+        self.main_layout.setSpacing(10)
+        
+        # Header
+        self.main_layout.addWidget(AppHeader("My Garden", "Monitor and manage your plants' health"))
+        
+        # --- 2. Area Scroll & Grid ---
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        
+        self.content_widget = QWidget()
+        self.grid = QGridLayout(self.content_widget)
+        self.grid.setSpacing(20)
+        self.grid.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        
+        self.scroll.setWidget(self.content_widget)
+        self.main_layout.addWidget(self.scroll)
 
-        scroll.setWidget(content_widget)
-        layout.addWidget(scroll)
+        # --- 3. Render Awal ---
+        self.refresh_plant_list()
+
+    def refresh_plant_list(self):
+        """Menghapus kartu lama dan menggambar ulang berdasarkan data terbaru."""
+        print("--- DEBUG REFRESH ---")
+        print(f"ID Objek PlantManager: {id(self.plant_manager)}")
+        print(f"Isi plantList: {self.plant_manager.plantList}")
+        
+        # 1. HAPUS SEMUA WIDGET LAMA DARI GRID
+        # Kita loop terbalik untuk menghapus dengan aman
+        for i in reversed(range(self.grid.count())): 
+            widget = self.grid.itemAt(i).widget()
+            if widget is not None: 
+                widget.setParent(None) # Lepaskan dari layout
+                widget.deleteLater()   # Hapus dari memori
+
+        # 2. TAMBAHKAN KARTU 'ADD PLANT' (Selalu di posisi Baris 0, Kolom 0)
+        add_card = AddPlantCard()
+        add_card.clicked.connect(self.open_add_plant_form)
+        self.grid.addWidget(add_card, 0, 0)
+
+        # 3. AMBIL DATA DARI MANAGER
+        # Pastikan PlantManager punya atribut plantList yang berisi Objek Plant
+        plants = self.plant_manager.plantList 
+
+        print(f"Debug: Menampilkan {len(plants)} tanaman.") # Cek di terminal
+
+        # 4. LOOPING UNTUK MENAMPILKAN KARTU TANAMAN
+        row = 0
+        col = 1 # Mulai dari kolom 1 karena kolom 0 sudah dipakai AddCard
+        max_cols = 3 # Misal 3 kolom per baris (sesuaikan lebar layar)
+
+        for plant in plants:
+            # Ambil data dari OBJEK Plant (gunakan Getter)
+            # Pastikan objek plant punya metode ini
+            p_name = plant.getPlantName()
+            p_species = plant.getPlantSpecies()
+            p_media = plant.getPlantMedia()
+            p_sun = "Sun" # Atau plant.getSunlight() jika ada
+
+            # Siapkan data stats untuk kartu
+            stats = {"🌱": p_media, "☀️": p_sun}
+
+            # Buat Kartu
+            card = PlantCard(
+                name=p_name,
+                sci_name=p_species,
+                stats=stats,
+                action_text="Details" 
+            )
+            
+            # Masukkan ke Grid
+            self.grid.addWidget(card, row, col)
+
+            # 5. HITUNG POSISI BERIKUTNYA
+            col += 1
+            if col >= max_cols:
+                col = 0      # Reset ke kolom pertama
+                row += 1     # Pindah ke baris baru
+            
+            # PENTING: Jika baris baru dimulai (row > 0),
+            # jangan biarkan AddCard tertimpa jika kita kembali ke (0,0).
+            # Tapi logika di atas (0,0) hanya untuk AddCard. 
+            # Jika row > 0, col 0 aman digunakan untuk tanaman.
+            # Jika row == 0, col 0 JANGAN digunakan (skip ke 1).
+            
+            if row == 0 and col == 0:
+                col = 1
+
+    def open_add_plant_form(self):
+        """Membuka dialog tambah tanaman."""
+        form = AddPlantForm(self)
+        
+        if form.exec_() == QDialog.Accepted:
+            # 1. Ambil data dictionary dari form
+            data = form.get_data()
+            
+            # 2. Lengkapi data yang kurang (PENTING UNTUK CONTROLLER)
+            # Controller butuh userID dan plantID untuk membuat Objek
+            data['userID'] = self.current_user_id
+            
+            # Generate ID Sederhana (atau biarkan Controller handle UUID)
+            # Agar tidak error di constructor Plant
+            import time
+            data['plantID'] = f"P{int(time.time())}" 
+            data['date'] = "2025-01-01" # Default date string jika form tidak kirim
+            
+            print("Debug: Mengirim data ke Manager:", data)
+
+            # 3. Panggil Controller
+            # Pastikan di PlantManager.py nama metodenya benar (onAddClick atau addNewPlant)
+            self.plant_manager.onAddClick(data) 
+            
+            # 4. Refresh UI
+            self.refresh_plant_list()
+            
+            QMessageBox.information(self, "Success", f"Tanaman '{data['name']}' berhasil ditambahkan!")
 
 # --- MAIN WINDOW (Logika Navigasi) ---
 class MainWindow(QMainWindow):
