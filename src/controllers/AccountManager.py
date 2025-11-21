@@ -10,6 +10,7 @@ from models.UserModel import UserModel
 # Import Views 
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
+from views.FormChangePassword import ChangePasswordForm
 from views.HomeScreen import MainWindow
 
 class AccountManager(QWidget):
@@ -44,11 +45,18 @@ class AccountManager(QWidget):
         self.stackWidget.addWidget(self.homeScreenView)
         self.widgets['homescreen'] = self.homeScreenView
         
+        self.changePasswordView = ChangePasswordForm()
+        self.stackWidget.addWidget(self.changePasswordView)
+        self.widgets['changepassword'] = self.changePasswordView
         
         self.loginView.switchToHomeScreen.connect(lambda: self.switchView('homescreen'))
         self.loginView.switchToRegisterRequested.connect(lambda: self.switchView('register'))
+        self.loginView.switchToChangePassword.connect(lambda: self.switchView('changepassword'))
         self.loginView.loginRequested.connect(self.handleLoginRequest)
-        
+
+        self.changePasswordView.switchToLoginRequested.connect(lambda: self.switchView('login'))
+        self.changePasswordView.changePasswordRequested.connect(self.handleChangePasswordRequest)
+
         self.registerView.switchToLoginRequested.connect(lambda: self.switchView('login'))
         self.registerView.registerRequested.connect(self.handleRegisterRequest)
         
@@ -64,10 +72,10 @@ class AccountManager(QWidget):
             self.currentUser = user_instance
             self.homeScreenView.set_current_user(self.currentUser)
             self.switchView('homescreen')
-            print(f"✅ Login Sukses untuk: {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
+            print(f"Login Success : {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
                         
         else:
-             print(f"❌ Login Gagal: {message}")
+             print(f"Login Gagal: {message}")
              self.loginView.errorDisplay.emit(message)
 
 
@@ -75,26 +83,39 @@ class AccountManager(QWidget):
         success, message = self.model.registerUser(username.strip(), email.strip(), password.strip(), location.strip(), confirmPassword.strip())
         
         if success:
-            print(f"✅ Registrasi Sukses untuk: {username}. Beralih ke Login.")
+            print(f"Registrasi Sukses untuk: {username}. Beralih ke Login.")
             
             self.registerView.clearForm()
             self.switchView('login')
             
         else:
-            print(f"❌ Registrasi Gagal: {message}")
+            print(f"Registrasi Gagal: {message}")
+            self.registerView.errorDisplay.emit(message)
+    
+    def handleChangePasswordRequest(self, username, email, newPassword, confirmPassword):
+        success, message = self.model.changePassword(username, email, newPassword, confirmPassword)
+        
+        if success:
+            print(f"Success To Change Password : {username}. To Login.")
+            
+            self.changePasswordView.clearForm()
+            self.switchView('login')
+        
+        else:
+            print(f"Failed to Change Password : {message}")
             self.registerView.errorDisplay.emit(message)
             
+         
     def handleLogoutRequest(self):
         self.currentUser = None
-        print("Pengguna berhasil logout.")
+        print("Logout Success.")
         self.switchView('login')
 
     
     def switchView(self, viewName):
-        """Mengganti tampilan yang ditampilkan di QStackedWidget."""
         if viewName in self.widgets:
             targetWidget = self.widgets[viewName]
             self.stackWidget.setCurrentWidget(targetWidget)
             self.setWindowTitle(targetWidget.windowTitle())
         else:
-            print(f"Error: View '{viewName}' tidak ditemukan. Mohon tambahkan HomescreenView.")
+            print(f"Error: View '{viewName}' not Found. Pls add a view.")

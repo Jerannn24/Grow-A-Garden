@@ -11,6 +11,7 @@ from PyQt5.QtCore import Qt, QByteArray, pyqtSignal
 class LoginForm(QWidget):
     switchToRegisterRequested = pyqtSignal()
     switchToHomeScreen = pyqtSignal() 
+    switchToChangePassword = pyqtSignal()
     loginRequested = pyqtSignal(str, str)
     errorDisplay = pyqtSignal(str)
     def __init__(self):
@@ -30,7 +31,7 @@ class LoginForm(QWidget):
         self.inputPass = QLineEdit() 
         self.loginButton = QPushButton() 
         self.signupLink = QLabel() 
-        
+        self.forgotLink = QLabel()
         self.errorLabel = QLabel("")
         self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
         
@@ -213,11 +214,11 @@ class LoginForm(QWidget):
             self.loginRequested.emit(inputEmail.text(), inputPass.text())
         )
         formLayout.addWidget(loginButton)
-        # Link Lupa Kata Sandi
         forgotLink = QLabel('<a href="#" style="color: #076804; text-decoration: none;">Forgot your Password?</a>')
-        forgotLink.setOpenExternalLinks(True)
+        forgotLink.setOpenExternalLinks(False)
         forgotLink.setAlignment(Qt.AlignCenter)
         forgotLink.setCursor(Qt.PointingHandCursor)
+        forgotLink.linkActivated.connect(self.switchToChangePassword.emit)
         formLayout.addWidget(forgotLink)
         
         # Pemisah 'atau'
@@ -226,7 +227,7 @@ class LoginForm(QWidget):
         separator.setFrameShadow(QFrame.Sunken)
         separator.setStyleSheet("margin: 20px 0;")
         
-        orLabel = QLabel("atau")
+        orLabel = QLabel("or")
         orLabel.setAlignment(Qt.AlignCenter)
         orLayout = QHBoxLayout()
         orLayout.addWidget(separator)
@@ -245,6 +246,7 @@ class LoginForm(QWidget):
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         
         self.inputEmail = inputEmail 
+        self.forgotLink = forgotLink
         self.inputPass = inputPass
         self.loginButton = loginButton
         self.signupLink = signupLink
@@ -253,8 +255,8 @@ class LoginForm(QWidget):
         return centerWidget
     
     def _setupConnections(self):
+        self.forgotLink.linkActivated.connect(lambda: self.switchToChangePassword.emit)
         self.signupLink.linkActivated.connect(self.switchToRegisterRequested.emit) 
-        
         self.loginButton.clicked.connect(lambda: 
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
         )
