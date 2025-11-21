@@ -4,9 +4,9 @@ from models.UserModel import DB_FILE_PATH
 
 class Plant:
     def __init__(self, userID, plantID, plantName, plantSpecies, 
-                 plantingStartDate, plantMedia=None, wateringFrequency=None, 
-                 lightingDuration=None, dailyWaterReq=None, dailyLightingReq=None, 
-                 fertilizerReq=None, plantPhase="Vegetatif", height=0, 
+                 plantingStartDate, plantMedia, wateringFrequency, 
+                 lightingDuration, dailyWaterReq=None, dailyLightingReq=None, 
+                 fertilizerReq=None, plantPhase="Germination", height=0, 
                  problem=None, harvestEstim=None):
         
         self.userID = userID

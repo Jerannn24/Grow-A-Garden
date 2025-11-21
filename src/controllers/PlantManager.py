@@ -48,7 +48,9 @@ class PlantManager:
                 plantSpecies=dataForm['species'],
                 plantingStartDate=dataForm['date'],
                 plantMedia=dataForm['media'],
-                lightingDuration=dataForm['sunlight_habit']
+                lightingDuration=dataForm['sunlight_habit'],
+                wateringFrequency=dataForm['watering_frequency'],
+                harvestEstim=123
             )
             
             # 2. Simpan ke Database (Coba blok ini dengan hati-hati)

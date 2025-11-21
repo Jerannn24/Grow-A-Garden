@@ -12,7 +12,7 @@ class AddPlantForm(QDialog):
         
         self.setWindowTitle("Add New Plant")
         self.setModal(True) 
-        self.setFixedSize(450, 560) 
+        self.setFixedSize(450, 600) 
         
         # Styling global untuk Dialog
         self.setStyleSheet("background-color: white; border-radius: 12px;") 
@@ -139,12 +139,12 @@ class AddPlantForm(QDialog):
             group_layout.addWidget(input_widget)
             return group_layout
 
-        # A. Plant Name
+        # Plant Name
         self.input_name = QLineEdit()
         self.input_name.setPlaceholderText("e.g. My Monstera")
         form_widgets_layout.addLayout(create_input_group("Plant Name", self.input_name))
 
-        # B. Species
+        # Species
         self.input_species = QLineEdit()
         self.input_species.setPlaceholderText("e.g. Monstera deliciosa")
         form_widgets_layout.addLayout(create_input_group("Species", self.input_species))
@@ -187,16 +187,16 @@ class AddPlantForm(QDialog):
             combo.setCurrentIndex(0)
             update_style() # Panggil sekali di awal untuk set warna abu-abu
 
-        # C. Growing Media
+        # Growing Media
         self.combo_media = QComboBox()
-        media_items = ["Soil", "Water (Hydroponic)", "Leca", "Sphagnum Moss", "Coco Coir"]
+        media_items = ["Soil", "Hydroponic", "Leca", "Sphagnum Moss", "Coco Coir"]
         # Pasang ke layout dulu agar style bisa diaplikasikan
         group_media = create_input_group("Growing Media", self.combo_media)
         form_widgets_layout.addLayout(group_media)
         # Baru setup logic placeholder
         setup_combo_placeholder(self.combo_media, "Pick Growing Media...", media_items)
 
-        # D. Sunlight Habit
+        # Sunlight Habit
         self.combo_sun = QComboBox()
         sun_items = [
             "Full Sun (6+ hours direct sun)",
@@ -208,6 +208,13 @@ class AddPlantForm(QDialog):
         group_sun = create_input_group("Sunlight Habit", self.combo_sun)
         form_widgets_layout.addLayout(group_sun)
         setup_combo_placeholder(self.combo_sun, "Pick Sunlight Habit...", sun_items)
+
+        # Watering Frequency
+        self.combo_water = QComboBox()
+        water_items = ["1", "2", "3", "4", "5"]
+        group_water = create_input_group("Watering Frequency per Day", self.combo_water)
+        form_widgets_layout.addLayout(group_water)
+        setup_combo_placeholder(self.combo_water, "Pick Watering Frequency...", water_items)
 
         main_layout.addLayout(form_widgets_layout)
         main_layout.addStretch()
@@ -275,18 +282,22 @@ class AddPlantForm(QDialog):
         species = self.input_species.text().strip()
         
         if not nama:
-            QMessageBox.warning(self, "Input Error", "Plant Name tidak boleh kosong!")
+            QMessageBox.warning(self, "Input Error", "Plant Name cannot be empty!")
             return
         if not species:
-            QMessageBox.warning(self, "Input Error", "Species tidak boleh kosong!")
+            QMessageBox.warning(self, "Input Error", "Species cannot be empty!")
             return
             
         if self.combo_media.currentIndex() == 0:
-            QMessageBox.warning(self, "Input Error", "Silakan pilih Growing Media!")
+            QMessageBox.warning(self, "Input Error", "Growing Media cannot be empty!")
             return
             
         if self.combo_sun.currentIndex() == 0:
-            QMessageBox.warning(self, "Input Error", "Silakan pilih Sunlight Habit!")
+            QMessageBox.warning(self, "Input Error", "Sunlight Habit cannot be empty!")
+            return
+        
+        if self.combo_water.currentIndex() == 0:
+            QMessageBox.warning(self, "Input Error", "Watering Frequency cannot be empty!")
             return
 
         self.accept()
@@ -300,4 +311,5 @@ class AddPlantForm(QDialog):
             "species": self.input_species.text().strip(),
             "media": self.combo_media.currentText(),
             "sunlight_habit": clean_sunlight,
+            "watering_frequency": self.combo_water.currentText(),
         }

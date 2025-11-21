@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QFrame, QMessageBox, QDialog
 from PyQt5.QtCore import Qt
 
@@ -59,14 +60,17 @@ class HomePage(QWidget):
             p_species = plant.getPlantSpecies()
             p_media = plant.getPlantMedia()
             p_sun = plant.getLightingDuration() 
+            p_water = plant.getWateringFrequency()
+            p_phase = plant.getPlantPhase()
+            p_harvest = plant.getHarvestEstim()
 
-            stats = {"🌱": p_media, "☀️": p_sun}
+            stats = {"🌱": p_media, "🔄": p_phase, "📅": p_harvest, "☀️": p_sun, "💧": p_water}
             
             card = PlantCard(
                 name=p_name,
                 sci_name=p_species,
                 stats=stats,
-                action_text="Details" 
+                action_text="Details",
             )
             
             self.flow_layout.addWidget(card)
@@ -90,7 +94,7 @@ class HomePage(QWidget):
             
             data['userID'] = self.current_user_id
             data['plantID'] = f"P{int(time.time())}" 
-            data['date'] = "2025-01-01" 
+            data['date'] = datetime.now().strftime('%Y-%m-%d')
             
             print("Debug: Mengirim data ke Manager:", data)
 

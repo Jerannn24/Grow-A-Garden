@@ -45,7 +45,7 @@ class LoginForm(QWidget):
         frameLayout.setContentsMargins(65, 55, 65, 50)
         
         iconSize = 160
-        svgFilePath = "src/public/icon.svg" 
+        svgFilePath = "public/icon.svg" 
         
         iconToAdd = None 
         svgWidget = QSvgWidget() 

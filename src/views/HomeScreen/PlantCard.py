@@ -7,7 +7,7 @@ class PlantCard(QFrame):
         super().__init__()
         self.setProperty("class", "plant-card")
         self.setStyleSheet("background-color: white; border-radius: 12px;")
-        self.setFixedSize(350, 390)
+        self.setFixedSize(350, 430)
         
         layout = QVBoxLayout()
         layout.setSpacing(8)
@@ -19,21 +19,67 @@ class PlantCard(QFrame):
         layout.addWidget(img_placeholder)
         
         title_lbl = QLabel(name)
-        title_lbl.setStyleSheet("font-weight: bold; font-size: 16px;")
+        title_lbl.setStyleSheet("font-weight: bold; font-size: 20px;")
         sub_lbl = QLabel(sci_name)
-        sub_lbl.setStyleSheet("color: gray; font-size: 12px; font-style: italic;")
+        sub_lbl.setStyleSheet("color: gray; font-size: 16px; font-style: italic; margin-bottom: 7px;")
         
         layout.addWidget(title_lbl)
         layout.addWidget(sub_lbl)
         
-        stats_layout = QHBoxLayout()
-        for icon, val in stats.items():
-            lbl = QLabel(f"{icon} {val}")
-            lbl.setStyleSheet("color: #555; background: #F5F5F5; padding: 4px 8px; border-radius: 4px;")
-            stats_layout.addWidget(lbl)
-        stats_layout.addStretch()
-        layout.addLayout(stats_layout)
+        stats_items = list(stats.items()) 
         
+        lbl_style = """
+            QLabel {
+                color: #555; 
+                background-color: #F5F5F5; 
+                padding: 6px 8px; 
+                border-radius: 6px;
+                font-weight: bold;
+            }
+        """
+
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(8)
+        row1_layout.setContentsMargins(0, 0, 0, 0)
+        
+        if len(stats_items) > 0:
+            icon, val = stats_items[0]
+            lbl = QLabel(f"{icon} {val}")
+            lbl.setStyleSheet(lbl_style)
+            lbl.setAlignment(Qt.AlignCenter) 
+            
+            row1_layout.addWidget(lbl, 1) 
+
+        layout.addLayout(row1_layout)
+
+        row2_layout = QHBoxLayout()
+        row2_layout.setSpacing(8)
+        row2_layout.setContentsMargins(0, 4, 0, 0)
+        
+        for i in range(1, 3): 
+            if i < len(stats_items):
+                icon, val = stats_items[i]
+                lbl = QLabel(f"{icon} {val}")
+                lbl.setStyleSheet(lbl_style)
+                lbl.setAlignment(Qt.AlignCenter)
+                row2_layout.addWidget(lbl, 1) 
+        
+        layout.addLayout(row2_layout)
+
+        row3_layout = QHBoxLayout()
+        row3_layout.setSpacing(8)
+        row3_layout.setContentsMargins(0, 4, 0, 0)
+        
+        for i in range(3, 5): 
+            if i < len(stats_items):
+                icon, val = stats_items[i]
+                lbl = QLabel(f"{icon} {val}")
+                lbl.setStyleSheet(lbl_style)
+                lbl.setAlignment(Qt.AlignCenter)
+                row3_layout.addWidget(lbl, 1)
+        
+        layout.addLayout(row3_layout)
+
         layout.addStretch()
         
         if warning:
