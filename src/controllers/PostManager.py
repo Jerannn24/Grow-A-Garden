@@ -7,9 +7,9 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget,
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
 from PyQt5.QtCore import Qt, QDateTime
 from models.UserModel import DB_FILE_PATH
-# ============================================
-# PATH CONFIGURATION
-# ============================================
+from PyQt5.QtGui import QIcon
+
+# path
 THIS_FILE = os.path.abspath(__file__)
 CONTROLLERS_DIR = os.path.dirname(THIS_FILE)
 SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
@@ -17,9 +17,6 @@ SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-# ============================================
-# IMPORTS
-# ============================================
 try:
     from views.DisplayPost import DisplayPost
 except ImportError:
@@ -28,17 +25,17 @@ except ImportError:
             super().__init__(parent)
             self.setLayout(QVBoxLayout())
             self.layout().addWidget(QLabel("DisplayPost tidak ditemukan"))
-        
+
         def render_post(self, post, replies_count=0):
             pass
-
+        
 try:
     from models.Post import Post
+    from models.UserModel import UserModel
 except ImportError:
-    print("ERROR: models.Post tidak dapat diimport")
+    print("ERROR: models.Post atau model.UserModel tidak dapat diimport")
     sys.exit(1)
 
-# --- CREATE POST WIDGET ---
 class CreatePostWidget(QWidget):
     def __init__(self, post_manager, parent=None):
         super().__init__(parent)
@@ -50,28 +47,23 @@ class CreatePostWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        # Title
         lbl_title = QLabel("📝 Buat Post Baru")
         lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #004d00; margin-bottom: 20px;")
         layout.addWidget(lbl_title)
 
-        # Input Title
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Masukkan Judul Post (Opsional)")
         self.title_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px;")
         layout.addWidget(self.title_input)
 
-        # Input Content
         self.content_input = QTextEdit()
         self.content_input.setPlaceholderText("Apa yang ingin kamu bagikan tentang kebunmu?")
         self.content_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-height: 150px;")
         layout.addWidget(self.content_input)
 
-        # Media Status Label
         self.media_status_lbl = QLabel("Tidak ada gambar dipilih.")
         self.media_status_lbl.setStyleSheet("color: #007F00; font-style: italic; margin-top: 5px;")
         
-        # Media Button
         media_action_layout = QHBoxLayout()
         self.btn_add_media = QPushButton("🖼️ Tambah Gambar")
         self.btn_add_media.setStyleSheet("""
@@ -89,7 +81,6 @@ class CreatePostWidget(QWidget):
         media_action_layout.addStretch(1)
         layout.addLayout(media_action_layout)
 
-        # Action Buttons
         btn_layout = QHBoxLayout()
         self.cancel_button = QPushButton("Batal")
         self.cancel_button.setStyleSheet("""
@@ -156,11 +147,13 @@ class CreatePostWidget(QWidget):
         if not content:
             QMessageBox.warning(self, "Peringatan", "Isi post tidak boleh kosong.")
             return
-
+        
+        user_id = self.post_manager.user_model.userID
+        
         time_created = QDateTime.currentDateTime().toString(Qt.ISODate)
 
         new_post = Post(
-            userID=1, 
+            userID=user_id, 
             title=title, 
             content=content, 
             media=self.selected_media_path,
@@ -174,27 +167,25 @@ class CreatePostWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error DB", f"Gagal membuat post: {e}")
 
-# --- POST MANAGER ---
 class PostManager(QWidget):
     def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         
-        # Pastikan db_path adalah absolute path
         if not os.path.isabs(db_path):
             db_path = os.path.join(SRC_DIR, db_path)
         
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
+        self.user_model = UserModel()
         self._setup_db()
 
-        # UI Setup
         self.stackWidget = QStackedWidget()
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.stackWidget)
 
-        # --- FEED PAGE ---
+        # Halaman feed
         self.feed_page = QWidget()
         feed_layout = QVBoxLayout(self.feed_page)
         feed_layout.setContentsMargins(0, 0, 0, 0)
@@ -208,12 +199,19 @@ class PostManager(QWidget):
             QListWidget::item {
                 background-color: white;
                 border-radius: 10px;
-                padding: 15px;
-                margin: 5px 0;
+                padding: 0px;
+                margin: 10px 0;
                 border: 1px solid #E0E0E0;
+                min-height: 140px;
             }
             QListWidget::item:hover {
-                background-color: #F5F5F5;
+                background-color: #F9F9F9;
+                border-color: #007F00;
+                cursor: pointer;
+            }
+            QListWidget::item:selected {
+                background-color: #E8F5E9;
+                border-color: #007F00;
             }
         """)
         self.list_widget.itemClicked.connect(self._on_item_clicked)
@@ -226,11 +224,10 @@ class PostManager(QWidget):
         
         self.stackWidget.addWidget(self.feed_page)
 
-        # --- DETAIL PAGE ---
         self.detail_view = DisplayPost()
         self.stackWidget.addWidget(self.detail_view)
 
-        # --- CREATE POST PAGE ---
+        # create post
         self.create_post_widget = CreatePostWidget(post_manager=self)
         self.stackWidget.addWidget(self.create_post_widget)
         
@@ -246,6 +243,10 @@ class PostManager(QWidget):
             print(f"❌ Error connecting to database: {e}")
             self.conn = None
 
+    def set_current_user(self, user_model: UserModel):
+        """Set the current logged-in user."""
+        self.user_model = user_model
+
     def switch_to_create_post(self):
         self.stackWidget.setCurrentWidget(self.create_post_widget)
 
@@ -259,7 +260,9 @@ class PostManager(QWidget):
             return
 
         self.list_widget.clear()
-        posts = self._load_posts(order_by=order_by, limit=limit)
+        posts = Post.get_all_posts(self.conn, order_by=order_by, limit=limit)
+        
+        posts = [p for p in posts if p.repliedPostID is None]
         
         if not posts:
             self.no_post_label.show()
@@ -269,68 +272,79 @@ class PostManager(QWidget):
             self.list_widget.show()
             
             for p in posts:
-                if p.repliedPostID is not None:
-                    continue
-
-                title = p.getTitle() or "(No Title)"
-                content_preview = (p.getContent()[:50] + '...') if len(p.getContent()) > 50 else p.getContent()
+                username = Post.getUsernameByID(self.conn, p.getAuthor())
+                title = p.getTitle() or ""
+                content = p.getContent() or ""
+            
+                content_preview = (content[:100] + '...') if len(content) > 100 else content
                 
-                display_text = f"**{title}**\n{content_preview}\n❤️ {p.getLikeCount()} likes | 👁️ {p.getViewCount()} views"
+                if title:
+                    display_text = f"""
+                    <div style='padding: 5px;'>
+                        <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
+                            <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
+                        </p>
+                        <p style='font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 12px 0;'>
+                            {title}
+                        </p>
+                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>
+                            {content_preview}
+                        </p>
+                        <p style='font-size: 13px; color: #888; margin: 0;'>
+                            <span style='color: #E91E63;'>❤️ {p.getLikeCount()}</span>  •  
+                            <span style='color: #2196F3;'>👁️ {p.getViewCount()}</span>
+                        </p>
+                    </div>
+                    """
+                else:
+                    display_text = f"""
+                    <div style='padding: 5px;'>
+                        <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
+                            <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
+                        </p>
+                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>
+                            {content_preview}
+                        </p>
+                        <p style='font-size: 13px; color: #888; margin: 0;'>
+                            <span style='color: #E91E63;'>❤️ {p.getLikeCount()}</span>  •  
+                            <span style='color: #2196F3;'>👁️ {p.getViewCount()}</span>
+                        </p>
+                    </div>
+                    """
                 
-                item = QListWidgetItem(display_text)
+                item = QListWidgetItem()
                 item.setData(Qt.UserRole, p.getPostID())
+                
+                widget = QWidget()
+                widget_layout = QVBoxLayout(widget)
+                widget_layout.setContentsMargins(15, 15, 15, 15)
+                widget_layout.setSpacing(0)
+                
+                label = QLabel(display_text)
+                label.setWordWrap(True)
+                label.setTextFormat(Qt.RichText)
+                widget_layout.addWidget(label)
+            
+                item.setSizeHint(widget.sizeHint())
+                
                 self.list_widget.addItem(item)
+                self.list_widget.setItemWidget(item, widget)
             
         self.stackWidget.setCurrentIndex(0)
+
     
     def _on_item_clicked(self, item: QListWidgetItem):
         post_id = item.data(Qt.UserRole)
         self.show_post(post_id)
 
     def show_post(self, post_id: int):
-        post = self._get_post(post_id)
+        post = Post.get_by_id(self.conn, post_id)
         if not post:
             return
-        self._inc_view(post_id)
-        post = self._get_post(post_id)
-        replies = post.getTotalComments(self.conn) if hasattr(post, "getTotalComments") else 0
+        
+        post.incViewCount(self.conn)
+        post = Post.get_by_id(self.conn, post_id) 
+        replies = post.getTotalComments(self.conn) 
+        
         self.detail_view.render_post(post, replies_count=replies)
         self.stackWidget.setCurrentWidget(self.detail_view)
-
-    def _get_post(self, post_id: int) -> Optional[Post]:
-        if self.conn is None:
-            return None
-        get_by_id = getattr(Post, "get_by_id", None) or getattr(Post, "getByID", None)
-        if callable(get_by_id):
-            return get_by_id(self.conn, post_id)
-        cur = self.conn.execute("SELECT * FROM postList WHERE postID = ?", (post_id,))
-        row = cur.fetchone()
-        return Post.fromRowSQL(row) if row else None
-
-    def _load_posts(self, order_by: str = "timeCreated", limit: Optional[int] = None) -> List[Post]:
-        if self.conn is None:
-            return []
-        
-        mapping = {"timeCreated": "timeCreated", "likes": "likeCount", "views": "viewCount"}
-        col = mapping.get(order_by, "timeCreated")
-        
-        q = f"SELECT * FROM postList WHERE repliedPostID IS NULL ORDER BY {col} DESC"
-        params: List[Any] = []
-        if limit is not None:
-            q += " LIMIT ?"
-            params.append(int(limit))
-        
-        cur = self.conn.execute(q, tuple(params) if params else ())
-        rows = cur.fetchall()
-        
-        return [Post.fromRowSQL(r) for r in rows if Post.fromRowSQL(r) is not None]
-
-    def _inc_view(self, post_id: int):
-        post = self._get_post(post_id)
-        if post:
-            post.incViewCount(self.conn)
-
-    def _inc_like(self, post_id: int):
-        post = self._get_post(post_id)
-        if post:
-            post.incLikeCount(self.conn)

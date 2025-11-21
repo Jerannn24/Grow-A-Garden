@@ -149,6 +149,25 @@ class Post:
                 posts.append(p)
         return posts
 
+    def getUsernameByID(conn: sqlite3.Connection, user_id: int) -> str:
+        """
+        Ambil username dari database berdasarkan userID.
+        Mengembalikan username atau 'User {id}' jika tidak ditemukan.
+        """
+        if conn is None:
+            return f"User {user_id}"
+        
+        try:
+            cur = conn.execute("SELECT username FROM users WHERE userID = ?", (user_id,))
+            row = cur.fetchone()
+            if row:
+                return row[0] if isinstance(row, tuple) else row['username']
+            else:
+                return f"User {user_id}"
+        except Exception as e:
+            print(f"⚠️ Error getting username for userID {user_id}: {e}")
+            return f"User {user_id}"
+        
     @classmethod
     def get_by_id(cls, conn: sqlite3.Connection, post_id: int) -> Optional["Post"]:
         """Kembalikan Post atau None berdasarkan postID."""
