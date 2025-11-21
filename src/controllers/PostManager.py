@@ -1,6 +1,9 @@
 import sqlite3
 import sys
 import os
+import shutil
+import time
+
 from typing import Optional, List, Any
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget, 
                              QListWidgetItem, QApplication, QLabel, QPushButton, 
@@ -13,6 +16,8 @@ from PyQt5.QtGui import QIcon
 THIS_FILE = os.path.abspath(__file__)
 CONTROLLERS_DIR = os.path.dirname(THIS_FILE)
 SRC_DIR = os.path.dirname(CONTROLLERS_DIR)
+UPLOAD_DIR = os.path.join(SRC_DIR, "media")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
@@ -152,11 +157,18 @@ class CreatePostWidget(QWidget):
         
         time_created = QDateTime.currentDateTime().toString(Qt.ISODate)
 
+        media_path = ""
+        if self.selected_media_path:
+            filename = f"{int(time.time())}_{os.path.basename(self.selected_media_path)}"
+            target_path = os.path.join(UPLOAD_DIR, filename)
+            shutil.copy(self.selected_media_path, target_path)
+            media_path = target_path
+            
         new_post = Post(
             userID=user_id, 
             title=title, 
             content=content, 
-            media=self.selected_media_path,
+            media=media_path,
             timeCreated=time_created
         )
         
@@ -202,7 +214,7 @@ class PostManager(QWidget):
                 padding: 0px;
                 margin: 10px 0;
                 border: 1px solid #E0E0E0;
-                min-height: 140px;
+                min-height: 160px;
             }
             QListWidget::item:hover {
                 background-color: #F9F9F9;
@@ -224,7 +236,8 @@ class PostManager(QWidget):
         
         self.stackWidget.addWidget(self.feed_page)
 
-        self.detail_view = DisplayPost()
+        self.detail_view = DisplayPost(parent=self)
+        self.detail_view.backRequested.connect(self.switch_to_feed)
         self.stackWidget.addWidget(self.detail_view)
 
         # create post
@@ -280,35 +293,31 @@ class PostManager(QWidget):
                 
                 if title:
                     display_text = f"""
-                    <div style='padding: 5px;'>
+                    <div style='padding: 10px;'>
                         <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
                             <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
                         </p>
                         <p style='font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 12px 0;'>
                             {title}
                         </p>
-                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>
-                            {content_preview}
-                        </p>
-                        <p style='font-size: 13px; color: #888; margin: 0;'>
-                            <span style='color: #E91E63;'>❤️ {p.getLikeCount()}</span>  •  
-                            <span style='color: #2196F3;'>👁️ {p.getViewCount()}</span>
-                        </p>
+                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>{content_preview}</p>
+                        <div style='display: flex; justify-content: flex-end; gap: 20px; font-size: 14px; margin: 5px 0 0 0;'>
+                            <span style='color: #E91E63; font-weight: 500;'>❤️ {p.getLikeCount()}</span>
+                            <span style='color: #2196F3; font-weight: 500;'>👁️ {p.getViewCount()}</span>
+                        </div>
                     </div>
                     """
                 else:
                     display_text = f"""
-                    <div style='padding: 5px;'>
+                    <div style='padding: 10px;'>
                         <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
                             <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
                         </p>
-                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>
-                            {content_preview}
-                        </p>
-                        <p style='font-size: 13px; color: #888; margin: 0;'>
-                            <span style='color: #E91E63;'>❤️ {p.getLikeCount()}</span>  •  
-                            <span style='color: #2196F3;'>👁️ {p.getViewCount()}</span>
-                        </p>
+                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>{content_preview}</p>
+                        <div style='display: flex; justify-content: flex-end; gap: 20px; font-size: 14px; margin: 5px 0 0 0;'>
+                            <span style='color: #E91E63; font-weight: 500;'>❤️ {p.getLikeCount()}</span>
+                            <span style='color: #2196F3; font-weight: 500;'>👁️ {p.getViewCount()}</span>
+                        </div>
                     </div>
                     """
                 
@@ -316,6 +325,7 @@ class PostManager(QWidget):
                 item.setData(Qt.UserRole, p.getPostID())
                 
                 widget = QWidget()
+                widget.setCursor(Qt.PointingHandCursor)
                 widget_layout = QVBoxLayout(widget)
                 widget_layout.setContentsMargins(15, 15, 15, 15)
                 widget_layout.setSpacing(0)
@@ -323,6 +333,8 @@ class PostManager(QWidget):
                 label = QLabel(display_text)
                 label.setWordWrap(True)
                 label.setTextFormat(Qt.RichText)
+                label.setCursor(Qt.PointingHandCursor)
+                label.setAttribute(Qt.WA_TransparentForMouseEvents)
                 widget_layout.addWidget(label)
             
                 item.setSizeHint(widget.sizeHint())
