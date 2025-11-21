@@ -185,7 +185,7 @@ class LoginForm(QWidget):
         formLayout.addWidget(inputEmail)
         
         # Password (menggunakan label Bahasa Indonesia)
-        labelPass, inputPass = createFormField("Password", "••••••••", isPassword=True)
+        labelPass, inputPass = createFormField("Password", "Enter your password", isPassword=True)
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         

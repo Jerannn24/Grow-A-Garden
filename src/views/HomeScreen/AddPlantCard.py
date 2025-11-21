@@ -8,7 +8,7 @@ class AddPlantCard(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("AddCard")
-        self.setFixedSize(280, 320)
+        self.setFixedSize(350, 390)
         self.setCursor(Qt.PointingHandCursor) 
         
         layout = QVBoxLayout()

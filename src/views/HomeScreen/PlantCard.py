@@ -6,8 +6,8 @@ class PlantCard(QFrame):
     def __init__(self, name, sci_name, stats, action_text=None, warning=None):
         super().__init__()
         self.setProperty("class", "plant-card")
-        self.setStyleSheet("background-color: white; border-radius: 12px; border: 1px solid #E0E0E0;")
-        self.setFixedSize(280, 320)
+        self.setStyleSheet("background-color: white; border-radius: 12px;")
+        self.setFixedSize(350, 390)
         
         layout = QVBoxLayout()
         layout.setSpacing(8)
