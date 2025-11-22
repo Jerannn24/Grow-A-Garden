@@ -1,17 +1,18 @@
 import time
 from datetime import datetime
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QFrame, QMessageBox, QDialog
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 
 from controllers.PlantManager import PlantManager
 from views.AddPlantForm import AddPlantForm
 from views.RemovePlantForm import RemovePlantForm
 from .PlantCard import PlantCard
 from .AddPlantCard import AddPlantCard
-from .AppHeader import AppHeader
 from .FlowLayout import FlowLayout
 
 class HomePage(QWidget):
+    openDetailRequested = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         
@@ -23,9 +24,7 @@ class HomePage(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(30, 30, 30, 30)
         self.main_layout.setSpacing(10)
-        
-        self.main_layout.addWidget(AppHeader("My Garden", "Monitor and manage your plants' health"))
-        
+                
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -76,12 +75,12 @@ class HomePage(QWidget):
                 action_text="Details",
             )
             card.deleteRequested.connect(self.handle_delete_plant)
+            card.detailsRequested.connect(self.openDetailRequested.emit)
             self.flow_layout.addWidget(card)
                 
     def set_current_user_id(self, userID: int):
         if self.current_user_id != userID:
             self.current_user_id = userID
-            # Muat data saat UserID sudah valid
             self.plant_manager.loadUserData(self.current_user_id)
             self.refresh_plant_list()
     

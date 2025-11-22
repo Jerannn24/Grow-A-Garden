@@ -1,12 +1,14 @@
 import sqlite3
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QPushButton, QStackedWidget, QLabel
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from models.UserModel import DB_FILE_PATH
 from models.Post import Post
 from views.DisplayCommunity import DisplayCommunity
 from .Sidebar import Sidebar
+from .AppHeader import AppHeader
 from .HomePage import HomePage
+from views.PlantDetails import PlantDetails
 
 
 STYLE_SHEET = """
@@ -60,15 +62,25 @@ class MainWindow(QMainWindow):
         
         self.sidebar = Sidebar()
         main_layout.addWidget(self.sidebar)
+
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+
+        self.topbar = AppHeader("My Garden", "Monitor and manage your plants' health")
+        right_layout.addWidget(self.topbar)
         
         self.pages = QStackedWidget()
-        main_layout.addWidget(self.pages)
+        right_layout.addWidget(self.pages)
         
+        main_layout.addWidget(right_widget)
         # inisiasi halaman home
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
         self.settings_page = QWidget() 
+        self.detail_page = PlantDetails()
 
         self.setStyleSheet(STYLE_SHEET)
         # Tambahkan ke Stacked Widget
@@ -76,7 +88,7 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.community_page) # index 1 (Community)
         self.pages.addWidget(self.todo_page)      # index 2 (Todo)
         self.pages.addWidget(self.settings_page)  # index 3 (Settings)
-
+        self.pages.addWidget(self.detail_page)    # index 4 (Plant Details)
         self.nav_buttons = self.sidebar.get_nav_buttons()
         self.nav_mapping = {
             self.nav_buttons["home"]: 0,
@@ -91,6 +103,9 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(0)
         self.nav_buttons["home"].setChecked(True) 
         self.current_user = None
+
+        self.home_page.openDetailRequested.connect(self.show_plant_details)
+        self.detail_page.backRequested.connect(self.go_back_to_home)
     
     def set_current_user(self, user_model):
         self.current_user = user_model
@@ -116,3 +131,19 @@ class MainWindow(QMainWindow):
         
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
+    
+    def show_plant_details(self, plant_id):
+        print(f"Navigasi ke Detail Tanaman ID: {plant_id}")
+        
+        target_plant = next((p for p in self.home_page.plant_manager.plantList if p.plantID == plant_id), None)
+        
+        if target_plant:
+            self.detail_page.populate_data(target_plant)
+            self.pages.setCurrentIndex(4) 
+            for btn in self.nav_buttons.values():
+                btn.setChecked(False)
+        else:
+            print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+
+    def go_back_to_home(self):
+        self._switch_page_and_update_sidebar(0, self.nav_buttons["home"])

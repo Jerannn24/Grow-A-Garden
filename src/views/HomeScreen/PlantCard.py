@@ -5,15 +5,16 @@ from PyQt5.QtGui import QFont, QCursor
 
 class PlantCard(QFrame):
     deleteRequested = pyqtSignal(str)
+    detailsRequested = pyqtSignal(str)
 
-    def __init__(self, plant_id, name, sci_name, stats, action_text=None, warning=None):
+    def __init__(self, plant_id, name, sci_name, stats, action_text=None):
         super().__init__()
         self.plant_id = plant_id
         self.setProperty("class", "plant-card")
         self.setStyleSheet("background-color: white; border-radius: 12px;")
         self.setFixedSize(350, 430)
 
-        self.btn_delete = QPushButton("⛏️", self)
+        self.btn_delete = QPushButton("🗑️", self)
         self.btn_delete.setFixedSize(50, 50)
         self.btn_delete.setCursor(QCursor(Qt.PointingHandCursor))
         self.btn_delete.setToolTip("Remove Plant")
@@ -107,16 +108,34 @@ class PlantCard(QFrame):
 
         layout.addStretch()
         
-        if warning:
-            warn_lbl = QLabel(warning)
-            warn_lbl.setAlignment(Qt.AlignCenter)
-            warn_lbl.setStyleSheet("background-color: #FFF9C4; color: #FBC02D; padding: 8px; border-radius: 6px; font-weight: bold;")
-            layout.addWidget(warn_lbl)
-        elif action_text:
-            btn = QPushButton(action_text)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.setStyleSheet("background-color: #E3F2FD; color: #1976D2; border: none; border-radius: 6px; padding: 10px; font-weight: bold;")
-            layout.addWidget(btn)
+        btn = QPushButton(action_text)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet("""
+            /* State Normal */
+            QPushButton {
+                background-color: #E3F2FD; 
+                color: #1976D2; 
+                border: none; 
+                border-radius: 6px; 
+                padding: 10px; 
+                font-weight: bold;
+            }
+            
+            /* State Hover (Saat mouse di atas tombol) */
+            QPushButton:hover {
+                background-color: #BBDEFB; /* Warna biru muda yang sedikit lebih gelap */
+                color: #1565C0;            /* Warna teks sedikit lebih tajam */
+            }
+
+            /* State Pressed (Opsional: Saat tombol ditekan) */
+            QPushButton:pressed {
+                background-color: #90CAF9; /* Lebih gelap lagi */
+                padding-top: 11px;         /* Efek tombol "mendelep" sedikit */
+                padding-bottom: 9px;
+            }
+        """)
+        layout.addWidget(btn)
+        btn.clicked.connect(self.emit_details_signal)
             
         self.setLayout(layout)
     
@@ -131,3 +150,6 @@ class PlantCard(QFrame):
 
     def emit_delete_signal(self):
         self.deleteRequested.emit(self.plant_id)
+
+    def emit_details_signal(self):
+        self.detailsRequested.emit(self.plant_id)
