@@ -1,13 +1,38 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QFont, QCursor
 
 
 class PlantCard(QFrame):
-    def __init__(self, name, sci_name, stats, action_text=None, warning=None):
+    deleteRequested = pyqtSignal(str)
+
+    def __init__(self, plant_id, name, sci_name, stats, action_text=None, warning=None):
         super().__init__()
+        self.plant_id = plant_id
         self.setProperty("class", "plant-card")
         self.setStyleSheet("background-color: white; border-radius: 12px;")
         self.setFixedSize(350, 430)
+
+        self.btn_delete = QPushButton("⛏️", self)
+        self.btn_delete.setFixedSize(50, 50)
+        self.btn_delete.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_delete.setToolTip("Remove Plant")
+        
+        self.btn_delete.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.9);
+                border: 1px solid #ddd;
+                border-radius: 25px;
+                font-size: 18px;
+                color: #555;
+            }
+            QPushButton:hover {
+                background-color: #ffebee; /* Merah muda pudar saat hover */
+                color: #d32f2f;
+                border: 1px solid #d32f2f;
+            }
+        """)
+        self.btn_delete.clicked.connect(self.emit_delete_signal)
         
         layout = QVBoxLayout()
         layout.setSpacing(8)
@@ -94,3 +119,15 @@ class PlantCard(QFrame):
             layout.addWidget(btn)
             
         self.setLayout(layout)
+    
+    def resizeEvent(self, event):
+        """
+        Dipanggil otomatis saat widget digambar/diubah ukurannya.
+        Memastikan tombol selalu di pojok kanan atas & DI ATAS widget lain.
+        """
+        super().resizeEvent(event)
+        self.btn_delete.move(self.width() - 60, 10)
+        self.btn_delete.raise_()
+
+    def emit_delete_signal(self):
+        self.deleteRequested.emit(self.plant_id)

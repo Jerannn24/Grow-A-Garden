@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt
 
 from controllers.PlantManager import PlantManager
 from views.AddPlantForm import AddPlantForm
+from views.RemovePlantForm import RemovePlantForm
 from .PlantCard import PlantCard
 from .AddPlantCard import AddPlantCard
 from .AppHeader import AppHeader
@@ -56,6 +57,7 @@ class HomePage(QWidget):
         plants = self.plant_manager.plantList 
 
         for plant in plants:
+            p_id = plant.getPlantID()
             p_name = plant.getPlantName()
             p_species = plant.getPlantSpecies()
             p_media = plant.getPlantMedia()
@@ -67,12 +69,13 @@ class HomePage(QWidget):
             stats = {"🌱": p_media, "🔄": p_phase, "📅": p_harvest, "☀️": p_sun, "💧": p_water}
             
             card = PlantCard(
+                plant_id=p_id,
                 name=p_name,
                 sci_name=p_species,
                 stats=stats,
                 action_text="Details",
             )
-            
+            card.deleteRequested.connect(self.handle_delete_plant)
             self.flow_layout.addWidget(card)
                 
     def set_current_user_id(self, userID: int):
@@ -102,3 +105,15 @@ class HomePage(QWidget):
             self.refresh_plant_list()
             
             QMessageBox.information(self, "Success", f"Tanaman '{data['name']}' berhasil ditambahkan!")
+
+    def handle_delete_plant(self, plant_id):
+            target_plant = next((p for p in self.plant_manager.plantList if p.plantID == plant_id), None)
+            
+            if target_plant:
+                dialog = RemovePlantForm(target_plant.getPlantName(), self)
+                
+                if dialog.exec_() == QDialog.Accepted:
+                    success = self.plant_manager.onDeleteClick(plant_id)
+                    
+                    if success:
+                        self.refresh_plant_list()

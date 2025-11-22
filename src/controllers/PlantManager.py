@@ -77,3 +77,34 @@ class PlantManager:
             print("Detail Error:")
             traceback.print_exc() # Ini akan memberitahu kita baris mana yang salah
             print("------------------------------------------------")
+    
+
+    def onDeleteClick(self, plantID):
+        """
+        Menghapus tanaman dari Database (via Model) dan List Memory.
+        Dipanggil oleh HomePage setelah konfirmasi user.
+        """
+        # 1. Cari objek tanaman di dalam list memory
+        plant_to_delete = None
+        for plant in self.plantList:
+            if plant.plantID == plantID:
+                plant_to_delete = plant
+                break
+        
+        if plant_to_delete:
+            try:
+                # 2. Panggil metode removePlant() milik MODEL (Plant.py)
+                # Ini akan menjalankan query DELETE di database sesuai kode yang kamu punya
+                plant_to_delete.removePlant() 
+
+                # 3. Hapus dari Memory List Manager agar sinkron
+                self.plantList.remove(plant_to_delete)
+                
+                print(f"✅ PlantManager: Tanaman {plantID} berhasil dihapus dari list & DB.")
+                return True
+            except Exception as e:
+                print(f"❌ PlantManager Error: Gagal menghapus tanaman. {e}")
+                return False
+        else:
+            print("⚠️ PlantManager: Tanaman tidak ditemukan di list.")
+            return False
