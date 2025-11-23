@@ -44,11 +44,13 @@ class HomePage(QWidget):
         """Menghapus kartu lama dan menggambar ulang berdasarkan data terbaru."""
         print("--- DEBUG REFRESH ---")
         print(f"ID Objek PlantManager: {id(self.plant_manager)}")
-        print(f"Isi plantList: {self.plant_manager.plantList}")
         
         if not self.current_user_id:
             print("Peringatan: UserID belum diset. Tidak memuat tanaman.")
             return
+        
+        self.plant_manager.loadUserData(self.current_user_id)
+        print(f"Isi plantList: {self.plant_manager.plantList}")
         
         for i in reversed(range(self.grid.count())): 
             widget = self.grid.itemAt(i).widget()
@@ -116,7 +118,7 @@ class HomePage(QWidget):
             data['userID'] = self.current_user_id
             import time
             data['plantID'] = f"P{int(time.time())}" 
-            data['date'] = "2025-01-01" 
+            data['date'] = data['date_acquired']
             
             print("Debug: Mengirim data ke Manager:", data)
 

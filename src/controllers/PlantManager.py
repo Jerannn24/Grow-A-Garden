@@ -1,6 +1,8 @@
 import sys
 import os
 import traceback # Untuk melihat detail error
+import sqlite3
+from datetime import datetime, timedelta
 
 project_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if project_root_dir not in sys.path:
@@ -36,20 +38,28 @@ class PlantManager:
     def getPlant(self, plantID):
         return Plant.getPlant(plantID, self.plantList)
 
-    def onAddClick(self, dataForm):
+    def onAddClick(self, dataForm: dict[str, any]):
         print("Manager: Memproses dataForm...", dataForm)
         
         try:
-            # 1. Mapping Data
+            acquiredDate = datetime.strptime(dataForm["date"], "%Y-%m-%d")
+            plantDate = acquiredDate - timedelta(days=30*dataForm["initial_age_months"])
+            age = int((plantDate - datetime.now()).days / 30)
+
+            # TODO: ambil data dari plants.db
+            
             new_plant = Plant(
                 userID=dataForm['userID'],
                 plantID=dataForm['plantID'],
                 plantName=dataForm['name'],
                 plantSpecies=dataForm['species'],
-                plantingStartDate=dataForm['date'],
+                plantingStartDate=plantDate,
                 plantMedia=dataForm['media'],
-                lightingDuration=dataForm['sunlight_habit']
+                lightingDuration=dataForm['sunlight_habit'],
+                height=dataForm.get('current_height_cm', 0),
+                leafColor=dataForm['current_leaf_color']
             )
+            new_plant.setRequirements()
             
             # 2. Simpan ke Database (Coba blok ini dengan hati-hati)
             print("Manager: Mencoba menyimpan ke Database...")

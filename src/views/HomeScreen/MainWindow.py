@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
             user_lbl.setText(f"👤 {user_model.username}\nID: {user_model.userID}")
             
         self.home_page.set_current_user_id(user_model.userID)
+        self.home_page.refresh_plant_list()
         
         # Set current user in community page's post manager
         if hasattr(self.community_page, 'post_manager'):
