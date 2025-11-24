@@ -27,9 +27,6 @@ class DisplayCommunity(QWidget):
         layout.setContentsMargins(30, 30, 30, 30) 
         layout.setSpacing(20)
 
-        header_widget = CommunityHeader()
-        layout.addWidget(header_widget) 
-
         title_container = QWidget()
         title_layout = QVBoxLayout(title_container)
         title_layout.setContentsMargins(0, 0, 0, 0)
@@ -80,8 +77,10 @@ class DisplayCommunity(QWidget):
                 background-color: #EFEFEF; 
                 border: 1px solid #DDD; 
                 border-radius: 15px; 
-                padding: 5px 15px;
-                margin-right: 5px;
+                padding: 8px 20px;
+                margin-right: 8px;
+                font-size: 14px; 
+                min-width: 100px;
             }
             QPushButton:checked {
                 background-color: #007F00;

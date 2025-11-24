@@ -94,12 +94,19 @@ class Post:
           likeCount INTEGER DEFAULT 0
         );
         """)
+        
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS postLikes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          postID INTEGER,
+          userID INTEGER,
+          UNIQUE(postID, userID)
+        );
+        """)
         conn.commit()
 
     def createPost(self, conn: sqlite3.Connection):
-
         Post.create_table(conn)
-
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO postList (userID, repliedPostID, title, content, media, timeCreated, viewCount, likeCount)
@@ -113,6 +120,7 @@ class Post:
             return
         cur = conn.cursor()
         cur.execute("DELETE FROM postList WHERE postID = ?", (self.postID,))
+        cur.execute("DELETE FROM postLikes WHERE postID = ?", (self.postID,))
         conn.commit()
 
     def incViewCount(self, conn: sqlite3.Connection):
@@ -128,6 +136,35 @@ class Post:
             cur = conn.cursor()
             cur.execute("UPDATE postList SET likeCount = ? WHERE postID = ?", (self.likeCount, self.postID))
             conn.commit()
+
+    @classmethod
+    def has_user_liked(cls, conn: sqlite3.Connection, post_id: int, user_id: int) -> bool:
+        if conn is None:
+            return False
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM postLikes WHERE postID = ? AND userID = ? LIMIT 1", (post_id, user_id))
+        return cur.fetchone() is not None
+
+    @classmethod
+    def toggle_like(cls, conn: sqlite3.Connection, post_id: int, user_id: int) -> int:
+        if conn is None:
+            return 0
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM postLikes WHERE postID = ? AND userID = ? LIMIT 1", (post_id, user_id))
+        exists = cur.fetchone() is not None
+        if exists:
+            cur.execute("DELETE FROM postLikes WHERE postID = ? AND userID = ?", (post_id, user_id))
+            cur.execute("UPDATE postList SET likeCount = MAX(0, likeCount - 1) WHERE postID = ?", (post_id,))
+        else:
+            try:
+                cur.execute("INSERT INTO postLikes (postID, userID) VALUES (?, ?)", (post_id, user_id))
+                cur.execute("UPDATE postList SET likeCount = likeCount + 1 WHERE postID = ?", (post_id,))
+            except sqlite3.IntegrityError:
+                pass
+        conn.commit()
+        cur.execute("SELECT likeCount FROM postList WHERE postID = ?", (post_id,))
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
 
     def getTotalComments(self, conn: sqlite3.Connection) -> int:
         if self.postID is None:
@@ -150,10 +187,6 @@ class Post:
         return posts
 
     def getUsernameByID(conn: sqlite3.Connection, user_id: int) -> str:
-        """
-        Ambil username dari database berdasarkan userID.
-        Mengembalikan username atau 'User {id}' jika tidak ditemukan.
-        """
         if conn is None:
             return f"User {user_id}"
         
@@ -170,21 +203,19 @@ class Post:
         
     @classmethod
     def get_by_id(cls, conn: sqlite3.Connection, post_id: int) -> Optional["Post"]:
-        """Kembalikan Post atau None berdasarkan postID."""
         cur = conn.execute("SELECT * FROM postList WHERE postID = ?", (post_id,))
         row = cur.fetchone()
         return cls.fromRowSQL(row) if row else None
 
     @classmethod
     def delete_by_id(cls, conn: sqlite3.Connection, post_id: int) -> None:
-        """Hapus post berdasarkan postID (helper opsional)."""
         cur = conn.cursor()
         cur.execute("DELETE FROM postList WHERE postID = ?", (post_id,))
+        cur.execute("DELETE FROM postLikes WHERE postID = ?", (post_id,))
         conn.commit()
 
     @classmethod
     def get_all_posts(cls, conn: sqlite3.Connection, order_by: str = "timeCreated", limit: Optional[int] = None) -> List["Post"]:
-        """Ambil semua post, delegasi query terpusat di model."""
         mapping = {"timeCreated": "timeCreated", "likes": "likeCount", "views": "viewCount"}
         col = mapping.get(order_by, "timeCreated")
         q = f"SELECT * FROM postList ORDER BY {col} DESC"

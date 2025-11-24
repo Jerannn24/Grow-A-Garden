@@ -5,6 +5,11 @@ from PyQt5.QtGui import QPixmap, QFont, QIcon
 import os
 from models.UserModel import DB_FILE_PATH
 
+THIS_FILE = os.path.abspath(__file__)
+VIEWS_DIR = os.path.dirname(THIS_FILE)
+SRC_DIR = os.path.dirname(VIEWS_DIR)
+UPLOAD_DIR = os.path.join(SRC_DIR, "media")
+
 class DisplayPost(QWidget):
     likeRequested = pyqtSignal(int)
     replyRequested = pyqtSignal(int)
@@ -67,6 +72,16 @@ class DisplayPost(QWidget):
         card_layout.setContentsMargins(25, 25, 25, 25)
         card_layout.setSpacing(15)
 
+        # ini buat cek kalau post tersebut adalah hasil sebuah reply post
+        self.reply_from_frame = QFrame()
+        self.reply_from_frame.setStyleSheet("background-color:#F5F5F5; border-radius:8px; padding:8px;")
+        self.reply_from_frame.hide()
+        reply_layout = QVBoxLayout(self.reply_from_frame)
+        self.reply_from_lbl = QLabel("")
+        self.reply_from_lbl.setWordWrap(True)
+        reply_layout.addWidget(self.reply_from_lbl)
+        card_layout.addWidget(self.reply_from_frame)
+        
         author_row = QHBoxLayout()
         
         self.avatar_lbl = QLabel("👤")
@@ -118,12 +133,9 @@ class DisplayPost(QWidget):
         self.media_container.hide() 
         card_layout.addWidget(self.media_container)
 
-        stats_row = QHBoxLayout()
-        self.stats_lbl = QLabel("0 Replies   0 Retweets   0 Likes")
+        self.stats_lbl = QLabel("")
         self.stats_lbl.setStyleSheet("color: gray; font-size: 13px; margin-top: 10px; border: none;")
-        stats_row.addWidget(self.stats_lbl)
-        stats_row.addStretch()
-        card_layout.addLayout(stats_row)
+        card_layout.addWidget(self.stats_lbl)
         
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
@@ -134,29 +146,29 @@ class DisplayPost(QWidget):
         actions_row = QHBoxLayout()
         actions_row.setSpacing(30)
 
-        def create_action_btn(icon_text):
-            btn = QPushButton(icon_text)
+        def create_action_btn(icon, text):
+            btn = QPushButton(f"{icon} {text}")
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet("""
-                QPushButton { background: transparent; border: none; font-size: 18px; color: #666; }
-                QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 15px; }
+                QPushButton { background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; }
+                QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
             """)
-            btn.setFixedSize(40, 40)
+            btn.setMinimumWidth(110)
+            btn.setMinimumHeight(44)
             return btn
 
-        self.btn_reply = create_action_btn("💬") 
-        self.btn_retweet = create_action_btn("🔁") 
-        self.btn_like = create_action_btn("❤️") 
-        self.btn_share = create_action_btn("📤") 
-        
-        self.btn_delete = create_action_btn("🗑️")
+        self.btn_reply = create_action_btn("💬", "Reply")
+        self.btn_like = create_action_btn("❤️","Like")
+        self.views_lbl = QLabel("0 Views")
+        self.views_lbl.setStyleSheet("color: #666; font-size: 15px; padding: 8px;")
+        self.views_lbl.setAlignment(Qt.AlignCenter)
+        self.views_lbl.setMinimumHeight(44)
+        self.views_lbl.setMinimumWidth(100)
 
         actions_row.addWidget(self.btn_reply)
-        actions_row.addWidget(self.btn_retweet)
         actions_row.addWidget(self.btn_like)
-        actions_row.addWidget(self.btn_share)
         actions_row.addStretch()
-        actions_row.addWidget(self.btn_delete) 
+        actions_row.addWidget(self.views_lbl)
 
         card_layout.addLayout(actions_row)
 
@@ -169,7 +181,6 @@ class DisplayPost(QWidget):
         self.back_btn.clicked.connect(lambda: self.backRequested.emit())
         self.btn_like.clicked.connect(lambda: self._emit_if_set(self.likeRequested))
         self.btn_reply.clicked.connect(lambda: self._emit_if_set(self.replyRequested))
-        self.btn_delete.clicked.connect(lambda: self._emit_if_set(self.deleteRequested))
 
     def _emit_if_set(self, sig):
         if self.post_id is not None:
@@ -185,6 +196,12 @@ class DisplayPost(QWidget):
         self.stats_lbl.setText("")
         self.media_container.clear()
         self.media_container.hide()
+        self.reply_from_frame.hide()
+        # reset like button style
+        self.btn_like.setStyleSheet("""
+            QPushButton { background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; }
+            QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
+        """)
     
     def render_post(self, post, replies_count: int = 0):
         if post is None:
@@ -195,6 +212,19 @@ class DisplayPost(QWidget):
         
         from models.Post import Post as PostModel
         
+        # show if this post is a reply from another post
+        if post.repliedPostID:
+            parent = PostModel.get_by_id(self.conn, post.repliedPostID)
+            if parent:
+                author = PostModel.getUsernameByID(self.conn, parent.getAuthor())
+                title = parent.getTitle() or "(no title)"
+                self.reply_from_lbl.setText(f"Reply from post \"{title}\" by {author}")
+                self.reply_from_frame.show()
+            else:
+                self.reply_from_frame.hide()
+        else:
+            self.reply_from_frame.hide()
+
         author_name = None
         if hasattr(self.parent(), 'user_model') and self.parent().user_model.userID == post.getAuthor():
             author_name = self.parent().user_model.username
@@ -217,13 +247,41 @@ class DisplayPost(QWidget):
         
         self.content_lbl.setText(post.getContent())
         
-        self.stats_lbl.setText(f"{replies_count} Replies • {post.getViewCount()} Views • {post.getLikeCount()} Likes")
-        
-        media_path = os.path.abspath(post.media)
+        self.stats_lbl.setText(f"{replies_count} Replies • {post.getLikeCount()} Likes")
+        self.views_lbl.setText(f"{post.getViewCount()} Views")
+
+        # ini buat nunjukin kalau post udah di like atau belum
+        liked = False
+        if self.conn and hasattr(self.parent(), 'user_model'):
+            try:
+                liked = PostModel.has_user_liked(self.conn, post.getPostID(), self.parent().user_model.userID)
+            except Exception:
+                liked = False
+
+        if liked:
+            self.btn_like.setStyleSheet("""
+                QPushButton { background: transparent; border: none; font-size: 16px; color: #E91E63; padding: 8px 16px; }
+                QPushButton:hover { color: #E91E63; background-color: #FDEBF0; border-radius: 20px; }
+            """)
+        else:
+            # default
+            self.btn_like.setStyleSheet("""
+                QPushButton { background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; }
+                QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
+            """)
+
+        media_value = post.media or ""
+        media_path = ""
+        if media_value:
+            if os.path.isabs(media_value):
+                media_path = media_value
+            else:
+                media_path = os.path.join(UPLOAD_DIR, media_value)
+
         if media_path and os.path.isfile(media_path):
             pix = QPixmap(media_path)
             if not pix.isNull():
-                scaled_pix = pix.scaled(600, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled_pix = pix.scaled(800, 500, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 self.media_container.setPixmap(scaled_pix)
                 self.media_container.setFixedHeight(scaled_pix.height())
                 self.media_container.show()

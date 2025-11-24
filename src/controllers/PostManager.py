@@ -8,7 +8,7 @@ from typing import Optional, List, Any
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget, 
                              QListWidgetItem, QApplication, QLabel, QPushButton, 
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtCore import Qt, QDateTime, QSize
 from models.UserModel import DB_FILE_PATH
 from PyQt5.QtGui import QIcon
 
@@ -46,15 +46,16 @@ class CreatePostWidget(QWidget):
         super().__init__(parent)
         self.post_manager = post_manager
         self.selected_media_path: str = ""
+        self.reply_to_post_id: Optional[int] = None
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        lbl_title = QLabel("📝 Buat Post Baru")
-        lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #004d00; margin-bottom: 20px;")
-        layout.addWidget(lbl_title)
+        self.lbl_title = QLabel("📝 Buat Post Baru")
+        self.lbl_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #004d00; margin-bottom: 20px;")
+        layout.addWidget(self.lbl_title)
 
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Masukkan Judul Post (Opsional)")
@@ -65,6 +66,10 @@ class CreatePostWidget(QWidget):
         self.content_input.setPlaceholderText("Apa yang ingin kamu bagikan tentang kebunmu?")
         self.content_input.setStyleSheet("padding: 10px; border: 1px solid #ccc; border-radius: 5px; min-height: 150px;")
         layout.addWidget(self.content_input)
+
+        self.replying_lbl = QLabel("")  # akan diisi jika reply
+        self.replying_lbl.setStyleSheet("color: #555; font-style: italic; margin-bottom: 8px;")
+        layout.addWidget(self.replying_lbl)
 
         self.media_status_lbl = QLabel("Tidak ada gambar dipilih.")
         self.media_status_lbl.setStyleSheet("color: #007F00; font-style: italic; margin-top: 5px;")
@@ -138,12 +143,26 @@ class CreatePostWidget(QWidget):
             self.selected_media_path = ""
             self.media_status_lbl.setText("Tidak ada gambar dipilih.")
 
+    def open_as_reply(self, parent_post_id: int, parent_title: str, parent_author: str):
+        self.reply_to_post_id = parent_post_id
+        self.replying_lbl.setText(f"Replying to: \"{parent_title}\" by {parent_author}")
+        self.lbl_title.setText("💬 Balas Post")
+        self.content_input.setFocus()
+
+        self.post_manager.stackWidget.setCurrentWidget(self)
+
     def cancel_post(self):
+        self._reset_inputs()
+        self.post_manager.switch_to_feed()
+        
+    def _reset_inputs(self):
         self.title_input.clear()
         self.content_input.clear()
         self.selected_media_path = ""
         self.media_status_lbl.setText("Tidak ada gambar dipilih.")
-        self.post_manager.switch_to_feed()
+        self.reply_to_post_id = None
+        self.replying_lbl.setText("")
+        self.lbl_title.setText("📝 Buat Post Baru")
         
     def submit_post(self):
         title = self.title_input.text().strip()
@@ -157,25 +176,33 @@ class CreatePostWidget(QWidget):
         
         time_created = QDateTime.currentDateTime().toString(Qt.ISODate)
 
-        media_path = ""
+        media_filename = ""
         if self.selected_media_path:
             filename = f"{int(time.time())}_{os.path.basename(self.selected_media_path)}"
             target_path = os.path.join(UPLOAD_DIR, filename)
-            shutil.copy(self.selected_media_path, target_path)
-            media_path = target_path
-            
+            try:
+                with open(self.selected_media_path, "rb") as src, open(target_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+                media_filename = filename
+            except Exception as e:
+                QMessageBox.warning(self, "File Error", f"Gagal menyalin file: {e}")
+                media_filename = ""
+
         new_post = Post(
             userID=user_id, 
+            repliedPostID=self.reply_to_post_id,
             title=title, 
             content=content, 
-            media=media_path,
+            media=media_filename,
             timeCreated=time_created
         )
         
         try:
             new_post.createPost(self.post_manager.conn)
             QMessageBox.information(self, "Sukses", "Post berhasil dibuat!")
-            self.cancel_post()
+            self._reset_inputs()
+            self.post_manager.reload_list()
+            self.post_manager.switch_to_feed()
         except Exception as e:
             QMessageBox.critical(self, "Error DB", f"Gagal membuat post: {e}")
 
@@ -214,7 +241,7 @@ class PostManager(QWidget):
                 padding: 0px;
                 margin: 10px 0;
                 border: 1px solid #E0E0E0;
-                min-height: 160px;
+                min-height: 180px;
             }
             QListWidget::item:hover {
                 background-color: #F9F9F9;
@@ -238,6 +265,8 @@ class PostManager(QWidget):
 
         self.detail_view = DisplayPost(parent=self)
         self.detail_view.backRequested.connect(self.switch_to_feed)
+        self.detail_view.likeRequested.connect(self._on_like_requested)
+        self.detail_view.replyRequested.connect(self._on_reply_requested)
         self.stackWidget.addWidget(self.detail_view)
 
         # create post
@@ -257,10 +286,10 @@ class PostManager(QWidget):
             self.conn = None
 
     def set_current_user(self, user_model: UserModel):
-        """Set the current logged-in user."""
         self.user_model = user_model
 
     def switch_to_create_post(self):
+        self.create_post_widget._reset_inputs()
         self.stackWidget.setCurrentWidget(self.create_post_widget)
 
     def switch_to_feed(self):
@@ -275,6 +304,7 @@ class PostManager(QWidget):
         self.list_widget.clear()
         posts = Post.get_all_posts(self.conn, order_by=order_by, limit=limit)
         
+        # hanya top-level posts di feed
         posts = [p for p in posts if p.repliedPostID is None]
         
         if not posts:
@@ -289,56 +319,50 @@ class PostManager(QWidget):
                 title = p.getTitle() or ""
                 content = p.getContent() or ""
             
-                content_preview = (content[:100] + '...') if len(content) > 100 else content
-                
-                if title:
-                    display_text = f"""
-                    <div style='padding: 10px;'>
-                        <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
-                            <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
-                        </p>
-                        <p style='font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 12px 0;'>
-                            {title}
-                        </p>
-                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>{content_preview}</p>
-                        <div style='display: flex; justify-content: flex-end; gap: 20px; font-size: 14px; margin: 5px 0 0 0;'>
-                            <span style='color: #E91E63; font-weight: 500;'>❤️ {p.getLikeCount()}</span>
-                            <span style='color: #2196F3; font-weight: 500;'>👁️ {p.getViewCount()}</span>
-                        </div>
-                    </div>
-                    """
-                else:
-                    display_text = f"""
-                    <div style='padding: 10px;'>
-                        <p style='font-size: 14px; color: #666; margin: 0 0 10px 0;'>
-                            <span style='color: #007F00; font-weight: bold;'>👤 {username}</span>
-                        </p>
-                        <p style='font-size: 15px; color: #333; margin: 0 0 15px 0; line-height: 1.5;'>{content_preview}</p>
-                        <div style='display: flex; justify-content: flex-end; gap: 20px; font-size: 14px; margin: 5px 0 0 0;'>
-                            <span style='color: #E91E63; font-weight: 500;'>❤️ {p.getLikeCount()}</span>
-                            <span style='color: #2196F3; font-weight: 500;'>👁️ {p.getViewCount()}</span>
-                        </div>
-                    </div>
-                    """
+                content_preview = (content[:150] + '...') if len(content) > 150 else content
                 
                 item = QListWidgetItem()
                 item.setData(Qt.UserRole, p.getPostID())
                 
                 widget = QWidget()
                 widget.setCursor(Qt.PointingHandCursor)
-                widget_layout = QVBoxLayout(widget)
-                widget_layout.setContentsMargins(15, 15, 15, 15)
-                widget_layout.setSpacing(0)
-                
-                label = QLabel(display_text)
+                widget_layout = QHBoxLayout(widget)
+                widget_layout.setContentsMargins(20, 18, 20, 18)
+                widget_layout.setSpacing(15)
+
+                left_col = QVBoxLayout()
+                left_col.setSpacing(10)
+
+                author_html = f"<span style='color: #007F00; font-weight: bold; font-size: 15px;'>👤 {username}</span>"
+                if title:
+                    main_html = f"<div style='font-size:18px; font-weight:bold; margin-top: 8px; margin-bottom:8px; color:#000;'>{title}</div>"
+                    sub_html = f"<div style='font-size:15px; color:#333; line-height:1.5;'>{content_preview}</div>"
+                else:
+                    main_html = f"<div style='font-size:15px; color:#333; line-height:1.5; margin-top: 8px;'>{content_preview}</div>"
+                    sub_html = ""
+                html = f"<div>{author_html}</div>{main_html}{sub_html}"
+                label = QLabel(html)
                 label.setWordWrap(True)
                 label.setTextFormat(Qt.RichText)
-                label.setCursor(Qt.PointingHandCursor)
                 label.setAttribute(Qt.WA_TransparentForMouseEvents)
-                widget_layout.addWidget(label)
-            
-                item.setSizeHint(widget.sizeHint())
+                left_col.addWidget(label)
+
+                widget_layout.addLayout(left_col, 1)
                 
+                right_col = QVBoxLayout()
+                right_col.setAlignment(Qt.AlignTop | Qt.AlignRight)
+                right_col.setSpacing(8)
+                
+                stats_lbl = QLabel(f"❤️ {p.getLikeCount()}<br>👁️ {p.getViewCount()}")
+                stats_lbl.setTextFormat(Qt.RichText)
+                stats_lbl.setStyleSheet("font-size:18px; color: #666; padding: 5px;")
+                stats_lbl.setAlignment(Qt.AlignRight | Qt.AlignTop)
+                stats_lbl.setMinimumWidth(100)
+                right_col.addWidget(stats_lbl)
+                
+                widget_layout.addLayout(right_col)
+                widget.setMinimumHeight(180)
+                item.setSizeHint(QSize(widget.sizeHint().width(), 200))
                 self.list_widget.addItem(item)
                 self.list_widget.setItemWidget(item, widget)
             
@@ -360,3 +384,22 @@ class PostManager(QWidget):
         
         self.detail_view.render_post(post, replies_count=replies)
         self.stackWidget.setCurrentWidget(self.detail_view)
+        
+    def _on_like_requested(self, post_id: int):
+        if self.conn is None or not hasattr(self.user_model, 'userID'):
+            return
+        user_id = self.user_model.userID
+        new_count = Post.toggle_like(self.conn, post_id, user_id)
+        
+        cur_post = Post.get_by_id(self.conn, post_id)
+        if cur_post:
+            replies = cur_post.getTotalComments(self.conn)
+            self.detail_view.render_post(cur_post, replies_count=replies)
+        
+    def _on_reply_requested(self, post_id: int):
+        parent_post = Post.get_by_id(self.conn, post_id)
+        if not parent_post:
+            return
+        author = Post.getUsernameByID(self.conn, parent_post.getAuthor())
+        title = parent_post.getTitle() or "(no title)"
+        self.create_post_widget.open_as_reply(parent_post_id=post_id, parent_title=title, parent_author=author)
