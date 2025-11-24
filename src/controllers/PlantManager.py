@@ -1,13 +1,11 @@
 import sys
 import os
-import traceback # Untuk melihat detail error
+import traceback 
 
 project_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if project_root_dir not in sys.path:
     sys.path.insert(0, project_root_dir)
-# ----------------------------
 
-# Import Model Plant dengan awalan 'src.'
 from src.models.Plant import Plant
 
 class PlantManager:
@@ -15,8 +13,6 @@ class PlantManager:
     def __init__(self):
         self.plantList = [] 
         
-        # --- PERBAIKAN UTAMA DI SINI ---
-        # Kita paksa pembuatan tabel saat Manager dimulai
         print("Manager: Memeriksa tabel database...")
         try:
             Plant.initialize_table()
@@ -40,7 +36,6 @@ class PlantManager:
         print("Manager: Memproses dataForm...", dataForm)
         
         try:
-            # 1. Mapping Data
             new_plant = Plant(
                 userID=dataForm['userID'],
                 plantID=dataForm['plantID'],
@@ -51,7 +46,6 @@ class PlantManager:
                 lightingDuration=dataForm['sunlight_habit']
             )
             
-            # 2. Simpan ke Database (Coba blok ini dengan hati-hati)
             print("Manager: Mencoba menyimpan ke Database...")
             try:
                 new_plant.addNewPlant()
@@ -59,10 +53,8 @@ class PlantManager:
                 
             except Exception as db_error:
                 print(f"Manager DB ERROR: {db_error}")
-                # Jika DB gagal, kita throw error agar tidak lanjut ke append
                 raise db_error 
 
-            # 3. Update List Lokal (Hanya jika DB sukses)
             self.plantList.append(new_plant)
             print("--- DEBUG ON ADD ---")
             print(f"ID Objek PlantManager (saat add): {id(self)}")
@@ -73,5 +65,5 @@ class PlantManager:
             print("------------------------------------------------")
             print(f"Manager GAGAL Menambah Tanaman: {e}")
             print("Detail Error:")
-            traceback.print_exc() # Ini akan memberitahu kita baris mana yang salah
+            traceback.print_exc() 
             print("------------------------------------------------")

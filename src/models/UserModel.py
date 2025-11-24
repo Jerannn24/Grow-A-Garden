@@ -30,12 +30,10 @@ class UserModel:
         self.notificationPreferences = notificationPreferences
         self.notificationTime = notificationTime
         if timeCreated is None:
-            # Set creation time if not provided, assuming this is a new model instance
             self.timeCreated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         else:
             self.timeCreated = timeCreated
             
-    # Removed @staticmethod as it accesses instance variable self.userID
     def getUserID(self):
         return self.userID
     
@@ -109,7 +107,6 @@ class UserModel:
         self.createTable(conn) 
 
         try:
-            # Added timeCreated to the insert query to ensure consistency
             query = "INSERT INTO users (username, email, password, location, profileInfo, timeCreated) VALUES (?, ?, ?, ?, ?, ?)"
             conn.execute(query, (username, email, password, location, profileInfo, self.timeCreated))
             conn.commit()
@@ -119,16 +116,13 @@ class UserModel:
 
     def loginUser(self, email: str, password: str) -> Tuple[Optional["UserModel"], str]:
         conn = self.get_conn()
-        # Query selects all columns, including timeCreated
         query = "SELECT * FROM users WHERE email = ? AND password = ?"
         cursor = conn.execute(query, (email, password))
         userRow = cursor.fetchone()
 
         if userRow:
-            # fromRowSQL must handle 12 columns now
             userInstance = UserModel.fromRowSQL(userRow) 
             if userInstance:
-                # Security measure: do not keep password in the returned object
                 userInstance.password = "" 
             return userInstance, "Login Success!"
         else:
@@ -187,7 +181,6 @@ class UserModel:
         
     @classmethod
     def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
-        # CRITICAL FIX: The 'users' table now has 12 columns (index 0 to 11)
         if row is None or len(row) < 12: 
             return None
         
@@ -196,7 +189,7 @@ class UserModel:
                 userID=row[0], username=row[1], password=row[2], email=row[3], 
                 profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7], 
                 location=row[8], notificationPreferences=row[9], notificationTime=row[10],
-                timeCreated=row[11] # Accessing the 12th column (index 11)
+                timeCreated=row[11]
             )
         except Exception as e:
             print(f"Error creating UserModel from row: {e}")

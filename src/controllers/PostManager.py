@@ -185,7 +185,6 @@ class PostManager(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.stackWidget)
 
-        # Halaman feed
         self.feed_page = QWidget()
         feed_layout = QVBoxLayout(self.feed_page)
         feed_layout.setContentsMargins(0, 0, 0, 0)
@@ -227,7 +226,6 @@ class PostManager(QWidget):
         self.detail_view = DisplayPost()
         self.stackWidget.addWidget(self.detail_view)
 
-        # create post
         self.create_post_widget = CreatePostWidget(post_manager=self)
         self.stackWidget.addWidget(self.create_post_widget)
         
