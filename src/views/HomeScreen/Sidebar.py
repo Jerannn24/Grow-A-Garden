@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
 from PyQt5.QtCore import Qt
-
-
+from models.UserModel import UserModel
+from typing import Optional
 class Sidebar(QFrame):
-    def __init__(self, parent=None):
+    def __init__(self, current_user: Optional[UserModel], parent=None):
         super().__init__(parent)
         self.setObjectName("Sidebar")
         self.setFixedWidth(250)
         self._buttons = {}
+        self.current_user = current_user
         
         layout = QVBoxLayout()
         layout.setContentsMargins(15, 20, 15, 20)
@@ -31,10 +32,40 @@ class Sidebar(QFrame):
         self.btn_settings = self.create_nav_btn("⚙️ Settings", "settings")
         layout.addWidget(self.btn_settings)
         
-        user_lbl = QLabel("👤 John Doe\nProfile")
-        user_lbl.setObjectName('user_info_label')
-        user_lbl.setStyleSheet("color: white; padding: 10px;")
-        layout.addWidget(user_lbl)
+        if self.current_user is not None:
+            username = self.current_user.getUsername()
+            initials = "".join([part[0].upper() for part in username.split() if part]) or "JD"
+        else:
+            username = "Guest User"
+            initials = "G"
+        
+        initials = "".join([part[0].upper() for part in username.split() if part]) or "JD"
+        button_text = f"  {initials}  {username}\n  Profile"
+        
+        self.btn_profile_final = QPushButton(button_text)
+        self.btn_profile_final.setObjectName("profile_button")
+        self.btn_profile_final.setProperty("class", "nav-btn-profile")
+        self.btn_profile_final.setStyleSheet("""
+            QPushButton#profile_button {
+                background-color: transparent; 
+                color: white; 
+                text-align: left;
+                padding: 10px;
+                border: none;
+                line-height: 1.2;
+            }
+            QPushButton#profile_button:hover {
+                background-color: rgba(255, 255, 255, 0.1); 
+            }
+        """)
+        
+        self._buttons['profile'] = self.btn_profile_final
+        layout.addWidget(self.btn_profile_final)
+        
+        # user_lbl = QLabel("👤 John Doe\nProfile")
+        # user_lbl.setObjectName('user_info_label')
+        # user_lbl.setStyleSheet("color: white; padding: 10px;")
+        # layout.addWidget(user_lbl)
         
         self.setLayout(layout)
 
@@ -45,5 +76,22 @@ class Sidebar(QFrame):
         self._buttons[name] = btn 
         return btn
     
+    def create_nav_btn_profile(self, text, name):
+        btn = QPushButton(text)
+        btn.setCheckable(True)
+        btn.setProperty("class", "nav-btn") 
+        self._buttons[name] = btn 
+        return btn
+    
+    def connect_profile_action(self, slot_function):
+        self.btn_profile_final.clicked.connect(slot_function)
+    
+    def update_profile_button(self, user_model: UserModel):
+        self.current_user = user_model
+        username = self.current_user.getUsername()
+        initials = "".join([part[0].upper() for part in username.split() if part]) or "JD"
+        button_text = f"  {initials}  {username}\n  Profile"
+        self.btn_profile_final.setText(button_text)
+        
     def get_nav_buttons(self):
         return self._buttons

@@ -4,12 +4,11 @@ import sys
 from PyQt5.QtWidgets import QApplication
 
 # Import Controller
-from controllers.AccountManager import AccountManager # <-- Import Controller baru
+from controllers.AccountManager import AccountManager 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     
-    # Hanya inisialisasi dan jalankan Controller (AccountManager)
     manager = AccountManager() 
     manager.show() 
     

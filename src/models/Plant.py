@@ -63,6 +63,7 @@ class Plant:
         conn.commit()
         conn.close()
 
+
     
     def calculateAgeInDays(self):
         today = datetime.now()
@@ -264,3 +265,25 @@ class Plant:
             plant_list.append(plant_obj)
         
         return plant_list
+    
+    @classmethod
+    def countUserPlants(cls, userID):
+        conn = None
+        try:
+            conn = cls._get_db_connection()
+            cursor = conn.cursor()
+            
+            # Kueri SQL untuk menghitung baris berdasarkan userID
+            query = "SELECT COUNT(*) FROM plants WHERE userID = ?"
+            cursor.execute(query, (userID,))
+            
+            # Ambil hasilnya. fetchone()[0] akan mengambil nilai COUNT.
+            count = cursor.fetchone()[0]
+            
+            return count
+        except sqlite3.Error as e:
+            print(f"[DB Error] Gagal menghitung tanaman untuk userID {userID}: {e}")
+            return 0
+        finally:
+            if conn:
+                conn.close()
