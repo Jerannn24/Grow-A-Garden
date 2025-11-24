@@ -29,12 +29,45 @@ class UserModel:
         self.notificationPreferences = notificationPreferences
         self.notificationTime = notificationTime
         
-
+    @staticmethod
+    def getUserID(self):
+        return self.userID
+    
+    def getUsername(self):
+        return self.username
+    
+    def getPassword(self):
+        return self.password
+    
+    def getEmail(self):
+        return self.email
+    
+    def getProfileInfo(self):
+        return self.profileInfo
+    
+    def getRole(self):
+        return self.role
+    
+    def getReportCount(self):
+        return self.reportCount
+    
+    def getStatus(self):
+        return self.status
+        
+    def getLocation(self):   
+        return self.location
+        
+    def getNotificationPreferences(self):   
+        return self.notificationPreferences
+        
+    def getNotificationTime(self): 
+        return self.notificationTime 
+    
     @staticmethod
     def get_conn() -> sqlite3.Connection:
-        """Membuka koneksi database baru untuk operasi."""
         return sqlite3.connect(DB_FILE_PATH)
 
+    
     def createTable(self, conn: sqlite3.Connection):
         """Membuat tabel users jika belum ada."""
         query = """
@@ -57,9 +90,10 @@ class UserModel:
 
     def registerUser(self, username, email, password, location, confirmPassword, profileInfo=""):
         if not username or not email or not password or not confirmPassword or not location:
-            return False, "Semua field harus diisi!"
+            return False, "Empty Field!"
+        
         if password != confirmPassword:
-            return False, "Password dan konfirmasi password tidak cocok!"
+            return False, "Password and Confirmation Password Different!"
 
         conn = self.get_conn()
         self.createTable(conn) 
@@ -68,24 +102,75 @@ class UserModel:
             query = "INSERT INTO users (username, email, password, location, profileInfo) VALUES (?, ?, ?, ?, ?)"
             conn.execute(query, (username, email, password, location, profileInfo))
             conn.commit()
-            return True, "Registrasi berhasil!"
+            return True, "Registration Sucess!"
         except sqlite3.IntegrityError:
-            return False, "Username atau email sudah terdaftar!"
+            return False, "Username or email used!"
 
     def loginUser(self, email: str, password: str) -> Tuple[Optional["UserModel"], str]:
         conn = self.get_conn()
         query = "SELECT * FROM users WHERE email = ? AND password = ?"
         cursor = conn.execute(query, (email, password))
-        user_row = cursor.fetchone()
+        userRow = cursor.fetchone()
 
-        if user_row:
-            user_instance = UserModel.fromRowSQL(user_row)
-            if user_instance:
-                user_instance.password = ""
-            return user_instance, "Login berhasil!"
+        if userRow:
+            userInstance = UserModel.fromRowSQL(userRow)
+            if userInstance:
+                userInstance.password = ""
+            return userInstance, "Login Success!"
         else:
-            return None, "Email atau password salah!"
+            return None, "Wrong Email or password!"
 
+    def changePassword(self, username:str, email:str, newPassword:str, confirmPassword:str):
+        if not email and not username and not newPassword and not confirmPassword:
+            return False, "There Is Empty Field"
+        
+        print(email, username)
+        
+        conn = self.get_conn()
+        query = "SELECT * FROM users WHERE email = ? AND username = ?"
+        cursor = conn.execute(query, (email, username))
+        userRow = cursor.fetchone()
+        
+        if not userRow:
+            return False, "User not found" 
+
+        if newPassword != confirmPassword:
+            return False,"Passwords do not match" 
+
+        update_query = "UPDATE users SET password = ? WHERE email = ? AND username = ?"
+        conn.execute(update_query, (newPassword, email, username))
+        conn.commit()
+
+        return True, "Password updated successfully" 
+
+    def updateProfil(self, userID: int, newUsername:str, newEmail: str, newProfileInfo: str, newLocation: str):
+        conn = self.get_conn()
+
+        check_query = "SELECT * FROM users WHERE userID = ?"
+        cursor = conn.execute(check_query, (userID,))
+        userRow = cursor.fetchone()
+
+        if not userRow:
+            return False, "User not found!"
+
+        email_check = "SELECT userID FROM users WHERE email = ? AND userID != ?"
+        cursor = conn.execute(email_check, (newEmail, userID))
+        existingEmail = cursor.fetchone()
+
+        if existingEmail:
+            return False, "Email was user by another user!"
+
+        update_query = """
+            UPDATE users
+            SET username = ?, email = ?, profileInfo = ?, location = ?
+            WHERE userID = ?
+            """
+            
+        conn.execute(update_query, (newUsername, newEmail, newProfileInfo, newLocation, userID))
+        conn.commit()
+
+        return True, "Profil updated!"
+        
     @classmethod
     def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
         if row is None or len(row) < 11:
