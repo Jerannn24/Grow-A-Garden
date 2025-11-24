@@ -8,7 +8,7 @@ from typing import Optional, List, Any
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QStackedWidget, QListWidget, 
                              QListWidgetItem, QApplication, QLabel, QPushButton, 
                              QHBoxLayout, QLineEdit, QTextEdit, QMessageBox, QFileDialog)
-from PyQt5.QtCore import Qt, QDateTime, QSize
+from PyQt5.QtCore import Qt, QDateTime, QSize, pyqtSignal
 from models.UserModel import DB_FILE_PATH
 from PyQt5.QtGui import QIcon
 
@@ -200,13 +200,20 @@ class CreatePostWidget(QWidget):
         try:
             new_post.createPost(self.post_manager.conn)
             QMessageBox.information(self, "Sukses", "Post berhasil dibuat!")
+            parent_id = self.reply_to_post_id
             self._reset_inputs()
-            self.post_manager.reload_list()
-            self.post_manager.switch_to_feed()
+            
+            if parent_id is not None:
+                self.post_manager.show_post(parent_id) 
+            else:
+                self.post_manager.reload_list()
+                self.post_manager.switch_to_feed()
         except Exception as e:
             QMessageBox.critical(self, "Error DB", f"Gagal membuat post: {e}")
 
 class PostManager(QWidget):
+    postSelected = pyqtSignal(int)
+    
     def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         
@@ -267,6 +274,7 @@ class PostManager(QWidget):
         self.detail_view.backRequested.connect(self.switch_to_feed)
         self.detail_view.likeRequested.connect(self._on_like_requested)
         self.detail_view.replyRequested.connect(self._on_reply_requested)
+        self.detail_view.showReplyDetailRequested.connect(self.show_post)
         self.stackWidget.addWidget(self.detail_view)
 
         # create post
@@ -304,9 +312,6 @@ class PostManager(QWidget):
         self.list_widget.clear()
         posts = Post.get_all_posts(self.conn, order_by=order_by, limit=limit)
         
-        # hanya top-level posts di feed
-        posts = [p for p in posts if p.repliedPostID is None]
-        
         if not posts:
             self.no_post_label.show()
             self.list_widget.hide()
@@ -334,12 +339,15 @@ class PostManager(QWidget):
                 left_col.setSpacing(10)
 
                 author_html = f"<span style='color: #007F00; font-weight: bold; font-size: 15px;'>👤 {username}</span>"
+                time_html = f"<span style='color: gray; font-size: 12px;'> &bull; {p.timeCreated}</span>"
+                
                 if title:
                     main_html = f"<div style='font-size:18px; font-weight:bold; margin-top: 8px; margin-bottom:8px; color:#000;'>{title}</div>"
                     sub_html = f"<div style='font-size:15px; color:#333; line-height:1.5;'>{content_preview}</div>"
                 else:
                     main_html = f"<div style='font-size:15px; color:#333; line-height:1.5; margin-top: 8px;'>{content_preview}</div>"
                     sub_html = ""
+                    
                 html = f"<div>{author_html}</div>{main_html}{sub_html}"
                 label = QLabel(html)
                 label.setWordWrap(True)
@@ -353,7 +361,8 @@ class PostManager(QWidget):
                 right_col.setAlignment(Qt.AlignTop | Qt.AlignRight)
                 right_col.setSpacing(8)
                 
-                stats_lbl = QLabel(f"❤️ {p.getLikeCount()}<br>👁️ {p.getViewCount()}")
+                replies_count = p.getTotalComments(self.conn)
+                stats_lbl = QLabel(f"❤️ {p.getLikeCount()}<br>💬 {replies_count}<br>👁️ {p.getViewCount()}")
                 stats_lbl.setTextFormat(Qt.RichText)
                 stats_lbl.setStyleSheet("font-size:18px; color: #666; padding: 5px;")
                 stats_lbl.setAlignment(Qt.AlignRight | Qt.AlignTop)
@@ -361,8 +370,9 @@ class PostManager(QWidget):
                 right_col.addWidget(stats_lbl)
                 
                 widget_layout.addLayout(right_col)
-                widget.setMinimumHeight(180)
-                item.setSizeHint(QSize(widget.sizeHint().width(), 200))
+                label.adjustSize()
+                widget.setMinimumHeight(label.sizeHint().height() + 50)
+                item.setSizeHint(QSize(widget.sizeHint().width(), widget.minimumHeight()))
                 self.list_widget.addItem(item)
                 self.list_widget.setItemWidget(item, widget)
             
@@ -371,7 +381,7 @@ class PostManager(QWidget):
     
     def _on_item_clicked(self, item: QListWidgetItem):
         post_id = item.data(Qt.UserRole)
-        self.show_post(post_id)
+        self.postSelected.emit(post_id)
 
     def show_post(self, post_id: int):
         post = Post.get_by_id(self.conn, post_id)
@@ -389,7 +399,7 @@ class PostManager(QWidget):
         if self.conn is None or not hasattr(self.user_model, 'userID'):
             return
         user_id = self.user_model.userID
-        new_count = Post.toggle_like(self.conn, post_id, user_id)
+        Post.toggle_like(self.conn, post_id, user_id)
         
         cur_post = Post.get_by_id(self.conn, post_id)
         if cur_post:

@@ -1,27 +1,40 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, 
                              QHBoxLayout, QFrame, QScrollArea, QSpacerItem, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QSize
 from PyQt5.QtGui import QPixmap, QFont, QIcon
 import os
+from typing import List, TYPE_CHECKING, Any 
 from models.UserModel import DB_FILE_PATH
 
 THIS_FILE = os.path.abspath(__file__)
 VIEWS_DIR = os.path.dirname(THIS_FILE)
 SRC_DIR = os.path.dirname(VIEWS_DIR)
 UPLOAD_DIR = os.path.join(SRC_DIR, "media")
+PUBLIC_DIR = os.path.join(SRC_DIR, "public")
+
+ICON_RED_HEART = os.path.join(PUBLIC_DIR, "heart_red.png")
+ICON_GREY_HEART = os.path.join(PUBLIC_DIR, "heart_grey.jpg")
+
+if TYPE_CHECKING:
+    from models.Post import Post as PostModel
+else:
+    from models.Post import Post as PostModel
+
 
 class DisplayPost(QWidget):
     likeRequested = pyqtSignal(int)
     replyRequested = pyqtSignal(int)
     deleteRequested = pyqtSignal(int)
     backRequested = pyqtSignal()
+    showReplyDetailRequested = pyqtSignal(int)
 
     def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         self.post_id = None
-        self.conn = self.parent().conn if self.parent() else None
+        self.conn = self.parent().conn if self.parent() and hasattr(self.parent(), 'conn') else None 
+        self.icon_red = QIcon(ICON_RED_HEART)
+        self.icon_grey = QIcon(ICON_GREY_HEART)
         self._init_ui() 
-
 
     def _init_ui(self):
         self.main_layout = QVBoxLayout(self)
@@ -158,7 +171,23 @@ class DisplayPost(QWidget):
             return btn
 
         self.btn_reply = create_action_btn("💬", "Reply")
-        self.btn_like = create_action_btn("❤️","Like")
+        self.btn_like = QPushButton("Like")
+        self.btn_like.setCursor(Qt.PointingHandCursor)
+        self.btn_like.setStyleSheet("""
+            QPushButton { 
+                background: transparent; border: none; font-size: 16px; color: #666; 
+                padding: 8px 16px; 
+                text-align: left;
+            }
+            QPushButton:hover { background-color: #E8F5E9; border-radius: 20px; }
+        """)
+        self.btn_like.setMinimumWidth(110)
+        self.btn_like.setMinimumHeight(44)
+        iconSize = 24
+        self.btn_like.setIconSize(QSize(iconSize,iconSize))
+        
+        self.btn_like.setIcon(self.icon_grey)
+        
         self.views_lbl = QLabel("0 Views")
         self.views_lbl.setStyleSheet("color: #666; font-size: 15px; padding: 8px;")
         self.views_lbl.setAlignment(Qt.AlignCenter)
@@ -173,6 +202,39 @@ class DisplayPost(QWidget):
         card_layout.addLayout(actions_row)
 
         content_layout.addWidget(self.card)
+
+        self.reply_section = QFrame()
+        self.reply_section.setStyleSheet("background-color: transparent;")
+        self.reply_layout = QVBoxLayout(self.reply_section)
+        self.reply_layout.setContentsMargins(25, 20, 25, 0)
+        self.reply_layout.setSpacing(10)
+        
+        self.replies_header_lbl = QLabel("Replies (0)")
+        self.replies_header_lbl.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #333;")
+        self.reply_layout.addWidget(self.replies_header_lbl)
+        
+        self.replies_list_widget = QListWidget()
+        self.replies_list_widget.setStyleSheet("""
+            QListWidget {
+                border: none;
+                background: transparent;
+            }
+            QListWidget::item {
+                border-bottom: 1px solid #E0E0E0;
+                padding: 10px 0;
+            }
+            QListWidget::item:hover {
+                background-color: #F8F8F8;
+            }
+        """)
+        self.replies_list_widget.setMinimumHeight(50)
+        self.replies_list_widget.setMaximumHeight(600)
+        self.replies_list_widget.setFrameShape(QFrame.NoFrame)
+        self.replies_list_widget.itemClicked.connect(self._on_reply_item_clicked) 
+        self.reply_layout.addWidget(self.replies_list_widget)
+
+        content_layout.addWidget(self.reply_section)
+        
         content_layout.addStretch()
         
         scroll.setWidget(content_container)
@@ -186,6 +248,11 @@ class DisplayPost(QWidget):
         if self.post_id is not None:
             sig.emit(self.post_id)
 
+    def _on_reply_item_clicked(self, item: QListWidgetItem):
+        post_id = item.data(Qt.UserRole)
+        if post_id is not None:
+            self.showReplyDetailRequested.emit(post_id)
+    
     def clear(self):
         self.post_id = None
         self.author_name_lbl.setText("")
@@ -197,12 +264,56 @@ class DisplayPost(QWidget):
         self.media_container.clear()
         self.media_container.hide()
         self.reply_from_frame.hide()
-        # reset like button style
+        self.replies_list_widget.clear()
+        self.replies_header_lbl.setText("Replies (0)")
+        self.btn_like.setIcon(self.icon_grey)
         self.btn_like.setStyleSheet("""
-            QPushButton { background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; }
+            QPushButton { 
+                background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; 
+                text-align: left;
+            }
             QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
         """)
-    
+        
+    def _render_replies(self, replies: List[PostModel]):
+        self.replies_list_widget.clear()
+        self.replies_header_lbl.setText(f"Replies ({len(replies)})")
+
+        for reply in replies:
+            author_name = PostModel.getUsernameByID(self.conn, reply.getAuthor())
+            content = reply.getContent() or ""
+            content_preview = (content[:150] + '...') if len(content) > 150 else content
+            
+            item = QListWidgetItem()
+            item.setData(Qt.UserRole, reply.getPostID())
+            
+            widget = QWidget()
+            widget.setCursor(Qt.PointingHandCursor)
+            
+            reply_html = f"""
+            <div style="padding: 10px 0; ">
+                <span style='color: #007F00; font-weight: bold; font-size: 15px;'>👤 {author_name}</span>
+                <span style='color: gray; font-size: 12px;'> &bull; {reply.timeCreated}</span>
+                <div style='font-size: 14px; color: #333; margin-top: 5px; line-height: 1.4;'>{content_preview}</div>
+                <div style='font-size: 12px; color: #999; margin-top: 5px;'>💬 {reply.getTotalComments(self.conn)} | ❤️ {reply.getLikeCount()}</div> 
+            </div>
+            """
+            
+            label = QLabel(reply_html)
+            label.setWordWrap(True)
+            label.setTextFormat(Qt.RichText)
+            label.setAttribute(Qt.WA_TransparentForMouseEvents)
+            
+            widget_layout = QVBoxLayout(widget)
+            widget_layout.setContentsMargins(0, 0, 0, 0)
+            widget_layout.addWidget(label)
+            
+            label.adjustSize()
+            item.setSizeHint(QSize(self.replies_list_widget.sizeHint().width(), label.sizeHint().height() + 10))
+            
+            self.replies_list_widget.addItem(item)
+            self.replies_list_widget.setItemWidget(item, widget)
+            
     def render_post(self, post, replies_count: int = 0):
         if post is None:
             self.clear()
@@ -210,9 +321,6 @@ class DisplayPost(QWidget):
 
         self.post_id = post.getPostID()
         
-        from models.Post import Post as PostModel
-        
-        # show if this post is a reply from another post
         if post.repliedPostID:
             parent = PostModel.get_by_id(self.conn, post.repliedPostID)
             if parent:
@@ -247,26 +355,36 @@ class DisplayPost(QWidget):
         
         self.content_lbl.setText(post.getContent())
         
-        self.stats_lbl.setText(f"{replies_count} Replies • {post.getLikeCount()} Likes")
+        all_replies = post.getAllComments(self.conn)
+        self.stats_lbl.setText(f"{len(all_replies)} Replies • {post.getLikeCount()} Likes")
+        self._render_replies(all_replies) 
+        
         self.views_lbl.setText(f"{post.getViewCount()} Views")
 
         # ini buat nunjukin kalau post udah di like atau belum
         liked = False
-        if self.conn and hasattr(self.parent(), 'user_model'):
+        if self.conn and hasattr(self.parent(), 'user_model') and self.parent().user_model:
             try:
                 liked = PostModel.has_user_liked(self.conn, post.getPostID(), self.parent().user_model.userID)
             except Exception:
                 liked = False
 
         if liked:
+            self.btn_like.setIcon(self.icon_red)
             self.btn_like.setStyleSheet("""
-                QPushButton { background: transparent; border: none; font-size: 16px; color: #E91E63; padding: 8px 16px; }
-                QPushButton:hover { color: #E91E63; background-color: #FDEBF0; border-radius: 20px; }
+                QPushButton { 
+                    background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; 
+                    text-align: left;
+                }
+                QPushButton:hover { color: #E91E63; background-color: #FDEBF0; border-radius: 20px; } 
             """)
         else:
-            # default
+            self.btn_like.setIcon(self.icon_grey)
             self.btn_like.setStyleSheet("""
-                QPushButton { background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; }
+                QPushButton { 
+                    background: transparent; border: none; font-size: 16px; color: #666; padding: 8px 16px; 
+                    text-align: left;
+                }
                 QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
             """)
 
@@ -289,4 +407,3 @@ class DisplayPost(QWidget):
                 self.media_container.hide()
         else:
             self.media_container.hide()
-            

@@ -41,6 +41,8 @@ class DisplayCommunity(QWidget):
         
         # Share Post Widget
         self.post_manager = PostManager(db_path=db_path)
+        self.post_manager.postSelected.connect(self.post_manager.show_post)
+        
         share_post_widget = SharePostWidget(post_manager=self.post_manager)
         layout.addWidget(share_post_widget)
         
