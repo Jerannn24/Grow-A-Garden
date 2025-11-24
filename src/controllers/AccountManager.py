@@ -26,7 +26,7 @@ class AccountManager(QWidget):
         mainLayout.addWidget(self.stackWidget)
         
         self.model = UserModel()
-        self.currentUser: Optional[UserModel] = None 
+        self.currentUser: UserModel = None 
         
         self._initViews()
         
@@ -64,19 +64,20 @@ class AccountManager(QWidget):
 
     
     def handleLoginRequest(self, email, password):        
-        user_instance, message = self.model.loginUser(email.strip(), password.strip())
+        user, message = self.model.loginUser(email.strip(), password.strip())
         
-        self.loginView.clearForm()
+        if user:
+            print(f"Login Sukses untuk: {user.getUsername()}")
+            self.currentUser = user
+            
+            if self.homeScreenView: 
+                self.homeScreenView.set_current_user(user)
 
-        if user_instance:
-            self.currentUser = user_instance
-            self.homeScreenView.set_current_user(self.currentUser)
+            self.loginView.clearForm()
             self.switchView('homescreen')
-            print(f"Login Success : {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
-                        
         else:
-             print(f"Login Gagal: {message}")
-             self.loginView.errorDisplay.emit(message)
+            self.loginView.errorDisplay.emit(message)
+            print(f"Login Gagal: {message}")
 
 
     def handleRegisterRequest(self, username, email, password, location, confirmPassword):
