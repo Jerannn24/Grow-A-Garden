@@ -96,7 +96,7 @@ class HomePage(QWidget):
             
             data['userID'] = self.current_user_id
             data['plantID'] = f"P{int(time.time())}" 
-            data['date'] = datetime.now().strftime('%Y-%m-%d')
+            data['date'] = data['date_acquired']
             
             print("Debug: Mengirim data ke Manager:", data)
 
