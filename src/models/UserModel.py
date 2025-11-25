@@ -98,12 +98,17 @@ class UserModel:
         conn.commit()
 
     def registerUser(self, username, email, password, location, confirmPassword, profileInfo=""):
+        MIN_PASSWORD_LENGTH = 8
+        
         if not username or not email or not password or not confirmPassword or not location:
             return False, "Empty Field!"
         
         if password != confirmPassword:
             return False, "Password and Confirmation Password Different!"
 
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return False, f"Password is too short! It must be at least {MIN_PASSWORD_LENGTH} characters long."
+            
         conn = self.get_conn()
         self.createTable(conn) 
 
@@ -121,6 +126,7 @@ class UserModel:
         cursor = conn.execute(query, (email, password))
         userRow = cursor.fetchone()
 
+            
         if userRow:
             userInstance = UserModel.fromRowSQL(userRow) 
             if userInstance:
@@ -133,7 +139,8 @@ class UserModel:
         if not email and not username and not newPassword and not confirmPassword:
             return False, "There Is Empty Field"
         
-        print(email, username)
+        if len(newPassword) < 8:
+            return None, f"Password is too short! It must be at least 8 characters long."
         
         conn = self.get_conn()
         query = "SELECT * FROM users WHERE email = ? AND username = ?"

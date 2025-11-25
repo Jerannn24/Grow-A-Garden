@@ -324,11 +324,9 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
             conn = cls._get_db_connection()
             cursor = conn.cursor()
             
-            # Kueri SQL untuk menghitung baris berdasarkan userID
             query = "SELECT COUNT(*) FROM plants WHERE userID = ?"
             cursor.execute(query, (userID,))
             
-            # Ambil hasilnya. fetchone()[0] akan mengambil nilai COUNT.
             count = cursor.fetchone()[0]
             
             return count

@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from PyQt5.QtCore import Qt
 from typing import Optional
@@ -23,7 +24,8 @@ class AccountManager(QWidget):
         
         self.model = UserModel()
         self.currentUser: UserModel = None 
-        
+        conn = self.model.get_conn()
+        self.model.createTable(conn) 
         self._initViews()
         
         self.switchView('login')

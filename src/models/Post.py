@@ -196,5 +196,23 @@ class Post:
         rows = cur.fetchall()
         return [cls.fromRowSQL(r) for r in rows if cls.fromRowSQL(r) is not None]
 
-
+    @classmethod
+    def countUserPosts(cls, user_id: int) -> int:
+        try:
+            from models.UserModel import UserModel 
+            conn = UserModel.get_conn() 
+        except ImportError:
+            print("Error: Could not import UserModel for DB connection.")
+            return 0
+            
+        count = 0
+        try:
+            cur = conn.execute("SELECT COUNT(postID) FROM postList WHERE userID = ?", (user_id,))
+            count = cur.fetchone()[0]
+        except Exception as e:
+            print(f"Error counting posts for user {user_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+        return count
 
