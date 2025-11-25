@@ -26,14 +26,23 @@ class LoginForm(QWidget):
         
         self.rightPanel = self._createRightPanel()
         mainLayout.addWidget(self.rightPanel, 1)
-        self.inputEmail = QLineEdit()
-        self.inputPass = QLineEdit() 
-        self.loginButton = QPushButton() 
-        self.signupLink = QLabel() 
-        
-        self.errorLabel = QLabel("")
-        self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
-        
+
+        # NOTE: Historically this constructor recreated several `self.*` widgets here
+        # (for example `self.inputEmail`, `self.inputPass`, `self.loginButton`,
+        # `self.signupLink`, and `self.errorLabel`). Those lines were removed because
+        # they duplicated the widgets created inside `_createRightPanel()` and thus
+        # overwrote the visible widgets in the layout with new unattached instances.
+        #
+        # Keeping the original code here as commented-out reference so future
+        # contributors understand why these lines must NOT be reintroduced:
+        # self.inputEmail = QLineEdit()
+        # self.inputPass = QLineEdit()
+        # self.loginButton = QPushButton()
+        # self.signupLink = QLabel()
+        #
+        # self.errorLabel = QLabel("")
+        # self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
+
         self._setupConnections()
        
     def _createLeftPanel(self):
@@ -189,6 +198,11 @@ class LoginForm(QWidget):
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         
+        # Error label (untuk menampilkan pesan login gagal / suspend / ban)
+        self.errorLabel = QLabel("")
+        self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
+        formLayout.addWidget(self.errorLabel)
+
         # Tombol Login
         loginButton = QPushButton("Sign In")
         loginButton.setFont(QFont('Geist', 14, QFont.Bold))
@@ -209,9 +223,6 @@ class LoginForm(QWidget):
         """)
         
         loginButton.setCursor(Qt.PointingHandCursor)
-        loginButton.clicked.connect(lambda: 
-            self.loginRequested.emit(inputEmail.text(), inputPass.text())
-        )
         formLayout.addWidget(loginButton)
         # Link Lupa Kata Sandi
         forgotLink = QLabel('<a href="#" style="color: #076804; text-decoration: none;">Forgot your Password?</a>')
@@ -239,7 +250,6 @@ class LoginForm(QWidget):
         signupLink.setOpenExternalLinks(False) 
         signupLink.setAlignment(Qt.AlignCenter)
         signupLink.setCursor(Qt.PointingHandCursor)
-        signupLink.linkActivated.connect(self.switchToRegisterRequested.emit)
         formLayout.addWidget(signupLink)
         
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -258,6 +268,9 @@ class LoginForm(QWidget):
         self.loginButton.clicked.connect(lambda: 
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
         )
+
+        # tampilkan pesan error/penolakan login
+        self.errorDisplay.connect(lambda msg: self.errorLabel.setText(msg))
         
     def clearForm(self):
         self.inputEmail.clear()
