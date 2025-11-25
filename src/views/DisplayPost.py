@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, 
-                             QHBoxLayout, QFrame, QScrollArea, QSpacerItem, QSizePolicy, QStackedWidget, QListWidget, QlistWidgetItem)
+                             QHBoxLayout, QFrame, QScrollArea, QSpacerItem, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap, QFont, QIcon
 import os
@@ -13,53 +13,9 @@ class DisplayPost(QWidget):
 
     def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
-        
-        self.stackWidget = QStackedWidget()
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 0)
-        layout.addWidget(self.stackWidget)
-        
-        self.feed_page = QWidget()
-        feed_layout = QVBoxLayout(self.feed_page)
-        feed_layout.setContentsMargins(0,0,0,0)
-        
-        lbl = QLabel("Community Feed")
-        lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #004d00; margin-bottom: 10px;")
-        feed_layout.addWidget(lbl)
-        
-        self.list_widget = QListWidget()
-
-        self.list_widget.setStyleSheet("""
-            QListWidget {
-                background-color: transparent;
-                border: none;
-                outline: none;
-            }
-            QListWidget::item {
-                background-color: white;
-                border-radius: 10px;
-                padding: 15px;
-                margin-bottom: 10px;
-                border: 1px solid #ddd;
-                color: #333;
-            }
-            QListWidget::item:hover {
-                background-color: #f9f9f9;
-                border-color: #007F00;
-            }
-            QListWidget::item:selected {
-                background-color: #E8F5E9;
-                color: #000;
-                border: 1px solid #007F00;
-            }
-        """)
-        feed_layout.addWidget(self.list_widget)
-        
-        self.stackWidget.addWidget(self.feed_page)
-
-        self.detail_view = DisplayPost() 
-        self.stackWidget.addWidget(self.detail_view) 
+        self.post_id = None
+        self.conn = self.parent().conn if self.parent() else None
+        self._init_ui() 
 
 
     def _init_ui(self):
@@ -143,16 +99,22 @@ class DisplayPost(QWidget):
         
         card_layout.addLayout(author_row)
 
+        self.title_lbl = QLabel()
+        self.title_lbl.setWordWrap(True)
+        self.title_lbl.setStyleSheet("font-size: 20px; font-weight: bold; color: #000; border: none; margin-top: 5px;")
+        self.title_lbl.hide() 
+        card_layout.addWidget(self.title_lbl)
+        
         self.content_lbl = QLabel("Content goes here...")
         self.content_lbl.setWordWrap(True)
         self.content_lbl.setStyleSheet("font-size: 16px; color: #333; line-height: 1.4; border: none; margin-top: 10px;")
         card_layout.addWidget(self.content_lbl)
 
         self.media_container = QLabel()
-        self.media_container.setScaledContents(True)
+        self.media_container.setScaledContents(False)
         self.media_container.setAlignment(Qt.AlignCenter)
         self.media_container.setStyleSheet("background-color: #F5F5F5; border-radius: 12px;")
-        self.media_container.setFixedHeight(250)
+        self.media_container.setMaximumHeight(400)
         self.media_container.hide() 
         card_layout.addWidget(self.media_container)
 
@@ -213,6 +175,17 @@ class DisplayPost(QWidget):
         if self.post_id is not None:
             sig.emit(self.post_id)
 
+    def clear(self):
+        self.post_id = None
+        self.author_name_lbl.setText("")
+        self.author_handle_lbl.setText("")
+        self.title_lbl.setText("")
+        self.title_lbl.hide()
+        self.content_lbl.setText("")
+        self.stats_lbl.setText("")
+        self.media_container.clear()
+        self.media_container.hide()
+    
     def render_post(self, post, replies_count: int = 0):
         if post is None:
             self.clear()
@@ -220,29 +193,42 @@ class DisplayPost(QWidget):
 
         self.post_id = post.getPostID()
         
+        from models.Post import Post as PostModel
         
-        author_name = f"User {post.getAuthor()}" 
-        handle = f"@{getattr(post, 'handle', 'emmaplants')}"
+        author_name = None
+        if hasattr(self.parent(), 'user_model') and self.parent().user_model.userID == post.getAuthor():
+            author_name = self.parent().user_model.username
+        elif self.conn:
+            author_name = PostModel.getUsernameByID(self.conn, post.getAuthor())
+
+        if not author_name:
+            author_name = f"User {post.getAuthor()}"
+            
+        handle = f"@{author_name.lower().replace(' ', '')}"
         
         self.author_name_lbl.setText(author_name)
         self.author_handle_lbl.setText(handle)
         
-        full_content = ""
         if post.getTitle():
-            full_content += f"**{post.getTitle()}**\n\n"
-        full_content += post.getContent()
+            self.title_lbl.setText(post.getTitle())
+            self.title_lbl.show()
+        else :
+            self.title_lbl.hide()
         
-        self.content_lbl.setText(full_content)
+        self.content_lbl.setText(post.getContent())
         
-        self.stats_lbl.setText(f"{replies_count} Replies   {post.getViewCount()} Views   {post.getLikeCount()} Likes")
+        self.stats_lbl.setText(f"{replies_count} Replies • {post.getViewCount()} Views • {post.getLikeCount()} Likes")
         
-        media_path = post.media
+        media_path = os.path.abspath(post.media)
         if media_path and os.path.isfile(media_path):
             pix = QPixmap(media_path)
-            self.media_container.setPixmap(pix.scaled(self.media_container.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            self.media_container.show()
+            if not pix.isNull():
+                scaled_pix = pix.scaled(600, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.media_container.setPixmap(scaled_pix)
+                self.media_container.setFixedHeight(scaled_pix.height())
+                self.media_container.show()
+            else:
+                self.media_container.hide()
         else:
-            self.media_container.setText("🍅") 
-            self.media_container.setFixedHeight(250)
-            self.media_container.show() 
+            self.media_container.hide()
             

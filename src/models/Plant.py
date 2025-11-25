@@ -1,14 +1,14 @@
 import sqlite3
 from datetime import datetime
-from models.UserModel import DB_FILE_PATH
+import os
+from models.UserModel import DB_FILE_PATH, GUIDE_FILE_PATH
 
 class Plant:
-
     def __init__(self, userID, plantID, plantName, plantSpecies, 
-                 plantingStartDate, plantMedia=None, wateringFrequency=None, 
-                 lightingDuration=None, dailyWaterReq=None, dailyLightingReq=None, 
-                 fertilizerReq=None, plantPhase="Vegetatif", height=0, 
-                 problem=None, harvestEstim=None):
+                 plantingStartDate, plantMedia=None, waterFreqPerWeek=None, 
+                 lightingDuration=None, waterVol=None, dailyLightingReq=None, 
+                 fertilizerFreqPerWeek=None, fertilizerVol=None, plantPhase=None,
+                 height=0, problem=None, harvestEstim=None, leafColor=None):
         
         self.userID = userID
         self.plantID = plantID
@@ -21,25 +21,33 @@ class Plant:
             self.plantingStartDate = plantingStartDate
             
         self.plantMedia = plantMedia
-        self.wateringFrequency = wateringFrequency
+        self.waterFreqPerWeek = waterFreqPerWeek
         self.lightingDuration = lightingDuration
-        self.dailyWaterReq = dailyWaterReq
+        self.waterVol = waterVol
         self.dailyLightingReq = dailyLightingReq
-        self.fertilizerReq = fertilizerReq
+        self.fertilizerFreqPerWeek = fertilizerFreqPerWeek
+        self.fertilizerVol = fertilizerVol
         self.plantPhase = plantPhase
         self.height = height
         self.problem = problem
         self.harvestEstim = harvestEstim
+        self.leafColor = leafColor
 
     @staticmethod
     def _get_db_connection():
+        folder = os.path.dirname(DB_FILE_PATH)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
         conn = sqlite3.connect(DB_FILE_PATH)
         conn.row_factory = sqlite3.Row
+        Plant.initialize_table(conn) 
+        
         return conn
 
     @staticmethod
-    def initialize_table():
-        conn = Plant._get_db_connection()
+    def initialize_table(existing_conn=None):
+        conn = existing_conn if existing_conn else sqlite3.connect(DB_FILE_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS plants (
@@ -49,22 +57,39 @@ class Plant:
                 plantSpecies TEXT,
                 plantingStartDate TEXT,
                 plantMedia TEXT,
-                wateringFrequency TEXT,
-                lightingDuration TEXT,
-                dailyWaterReq TEXT,
-                dailyLightingReq TEXT,
-                fertilizerReq TEXT,
                 plantPhase TEXT,
+                lightingDuration TEXT,
                 height REAL,
+                harvestEstim TEXT,
                 problem TEXT,
-                harvestEstim TEXT
+                leafColor TEXT
             )
         ''')
         conn.commit()
+        if not existing_conn:
+            conn.close()
+
+    def setRequirements(self):
+        conn = sqlite3.connect(GUIDE_FILE_PATH)
+        cursor = conn.cursor()
+        age = int(self.calculateAgeInDays() / 7)
+        cursor.execute('''SELECT
+base_care_profiles.water_freq_days, base_care_profiles.water_vol_ml, 
+base_care_profiles.sunlight_hours_req,
+base_care_profiles.fert_freq_days, base_care_profiles.fert_vol_ml
+FROM base_care_profiles INNER JOIN species
+ON base_care_profiles.species_id = species.id
+WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks >= ?''',
+(age, age,))
+        result = cursor.fetchall()[0]
+        self.setWateringFrequency(result[0])
+        self.setWaterReq(result[1])
+        self.setDailyLightingReq(result[2])
+        self.setFertilizerFreq(result[3])
+        self.setFertilizerReq(result[4])
         conn.close()
 
 
-    
     def calculateAgeInDays(self):
         today = datetime.now()
         delta = today - self.plantingStartDate
@@ -90,19 +115,22 @@ class Plant:
         return self.plantMedia
 
     def getWateringFrequency(self):
-        return self.wateringFrequency
+        return self.waterFreqPerWeek
 
     def getLightingDuration(self):
         return self.lightingDuration
 
-    def getDailyWaterReq(self):
-        return self.dailyWaterReq
+    def getWaterReq(self):
+        return self.waterVol
 
     def getDailyLightingReq(self):
         return self.dailyLightingReq
 
     def getFertilizerReq(self):
-        return self.fertilizerReq
+        return self.fertilizerVol
+    
+    def getFertilizerFreq(self):
+        return self.fertilizerFreqPerWeek
 
     def getPlantPhase(self):
         return self.plantPhase
@@ -148,19 +176,22 @@ class Plant:
         self.plantMedia = plantMedia
 
     def setWateringFrequency(self, wateringFrequency):
-        self.wateringFrequency = wateringFrequency
+        self.waterFreqPerWeek = wateringFrequency
 
     def setLightingDuration(self, lightingDuration):
         self.lightingDuration = lightingDuration
 
-    def setDailyWaterReq(self, dailyWaterReq):
-        self.dailyWaterReq = dailyWaterReq
+    def setWaterReq(self, waterReq):
+        self.waterVol = waterReq
 
     def setDailyLightingReq(self, dailyLightingReq):
         self.dailyLightingReq = dailyLightingReq
 
     def setFertilizerReq(self, fertilizerReq):
-        self.fertilizerReq = fertilizerReq
+        self.fertilizerVol = fertilizerReq
+
+    def setFertilizerFreq(self, fertilizerFreq):
+        self.fertilizerFreqPerWeek = fertilizerFreq
 
     def setPlantPhase(self, plantPhase):
         self.plantPhase = plantPhase
@@ -185,24 +216,45 @@ class Plant:
         query = '''
             INSERT INTO plants (
                 plantID, userID, plantName, plantSpecies, plantingStartDate,
-                plantMedia, wateringFrequency, lightingDuration, dailyWaterReq,
-                dailyLightingReq, fertilizerReq, plantPhase, height, problem, harvestEstim
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                plantMedia, plantPhase, lightingDuration, height, harvestEstim, 
+                problem, leafColor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         
-        date_str = self.plantingStartDate.strftime('%Y-%m-%d')
+        if isinstance(self.plantingStartDate, datetime):
+            date_str = self.plantingStartDate.strftime('%Y-%m-%d')
+        else:
+            date_str = self.plantingStartDate
         
         values = (
-            self.plantID, self.userID, self.plantName, self.plantSpecies, date_str,
-            self.plantMedia, self.wateringFrequency, self.lightingDuration, self.dailyWaterReq,
-            self.dailyLightingReq, self.fertilizerReq, self.plantPhase, self.height, 
-            self.problem, self.harvestEstim
+            self.plantID,       # 1
+            self.userID,        # 2
+            self.plantName,     # 3
+            self.plantSpecies,  # 4
+            date_str,           # 5
+            self.plantMedia,    # 6
+            self.plantPhase,    # 7
+            self.lightingDuration, # 8
+            self.height,        # 9
+            self.harvestEstim,  # 10
+            self.problem,       # 11
+            self.leafColor      # 12
         )
         
         try:
             cursor.execute(query, values)
             conn.commit()
             print(f"[DB Success] Tanaman '{self.plantName}' berhasil ditambahkan.")
+            print(self.getDailyLightingReq(), end=": ")
+            print(type(self.getDailyLightingReq()))
+            print(self.getWateringFrequency(), end=": ")
+            print(type(self.getWateringFrequency()))
+            print(self.getWaterReq(), end=": ")
+            print(type(self.getWaterReq()))
+            print(self.getFertilizerFreq(), end=": ")
+            print(type(self.getFertilizerFreq()))
+            print(self.getFertilizerReq(), end=": ")
+            print(type(self.getFertilizerReq()))
         except sqlite3.IntegrityError:
             print(f"[DB Error] ID Tanaman {self.plantID} sudah ada.")
         finally:
@@ -238,6 +290,9 @@ class Plant:
     def getAllPlant(cls, userID):
         conn = cls._get_db_connection()
         cursor = conn.cursor()
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
         query = "SELECT * FROM plants WHERE userID = ?"
         cursor.execute(query, (userID,))
         rows = cursor.fetchall()
@@ -252,18 +307,14 @@ class Plant:
                 plantSpecies=row['plantSpecies'],
                 plantingStartDate=row['plantingStartDate'],
                 plantMedia=row['plantMedia'],
-                wateringFrequency=row['wateringFrequency'],
                 lightingDuration=row['lightingDuration'],
-                dailyWaterReq=row['dailyWaterReq'],
-                dailyLightingReq=row['dailyLightingReq'],
-                fertilizerReq=row['fertilizerReq'],
-                plantPhase=row['plantPhase'],
                 height=row['height'],
                 problem=row['problem'],
-                harvestEstim=row['harvestEstim']
+                leafColor=row['leafColor'],
+                plantPhase=row['plantPhase'],
+                harvestEstim=row['harvestEstim'],
             )
             plant_list.append(plant_obj)
-        
         return plant_list
     
     @classmethod

@@ -1,10 +1,23 @@
 import sys
+import os
+import sqlite3
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
-    QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, QCompleter, QListView
+    QLabel, QLineEdit, QComboBox, QPushButton, QMessageBox, 
+    QCompleter, QListView, QSpinBox, QDateEdit, QWidget, QSizePolicy, QScrollArea,
 )
-from PyQt5.QtCore import Qt, QStringListModel
+from PyQt5.QtCore import Qt, QStringListModel, QDate, QEvent, QObject
 from PyQt5.QtGui import QFont, QStandardItemModel, QStandardItem, QColor
+
+
+class NoScrollEventFilter(QObject):
+    """Event filter to prevent mouse wheel from modifying spinbox/combobox values"""
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel:
+            if isinstance(obj, (QSpinBox, QDateEdit, QComboBox)):
+                return True  # Consume the wheel event
+        return super().eventFilter(obj, event)
+
 
 class AddPlantForm(QDialog):
     def __init__(self, parent=None):
@@ -12,16 +25,14 @@ class AddPlantForm(QDialog):
         
         self.setWindowTitle("Add New Plant")
         self.setModal(True) 
-        self.setFixedSize(450, 560) 
+        # allow resizing and use minimum size so long forms can scroll
+        self.setMinimumSize(450, 600)
         
-        # Styling global untuk Dialog
         self.setStyleSheet("background-color: white; border-radius: 12px;") 
 
-        # CSS CSS UTAMA
-        # Kita mendefinisikan logic warna langsung di sini menggunakan selector [is_placeholder="true"]
+        # --- CSS UTAMA (FIXED: Simplified QComboBox styling to prevent parsing errors) ---
         self.main_stylesheet = """
-            /* --- QLINEEDIT --- */
-            QLineEdit {
+            QLineEdit, QSpinBox, QDateEdit { 
                 padding: 8px 12px;
                 border: 1px solid #ddd;
                 border-radius: 8px;
@@ -30,27 +41,24 @@ class AddPlantForm(QDialog):
                 color: #333;
                 min-height: 30px;
             }
-            QLineEdit:focus {
+            QLineEdit:focus, QSpinBox:focus, QDateEdit:focus {
                 border: 1px solid #4CAF50;
                 background-color: #ffffff;
             }
 
-            /* --- QCOMBOBOX DEFAULT (Saat ada isinya) --- */
             QComboBox {
                 padding: 8px 12px;
                 border: 1px solid #ddd;
                 border-radius: 8px;
                 background-color: #fcfcfc;
                 font-size: 14px;
-                min-height: 30px;
-                color: #333; /* Warna Hitam Normal */
+                min-height: 30px; 
+                color: #333; 
             }
 
-            /* --- QCOMBOBOX PLACEHOLDER (Saat index 0) --- */
-            /* Selector ini aktif jika kita setProperty('is_placeholder', True) */
             QComboBox[is_placeholder="true"] {
-                color: #888;         /* Warna Abu-abu */
-                font-style: italic;  /* Miring */
+                color: #888;         
+                font-style: italic;  
             }
 
             QComboBox:focus {
@@ -58,24 +66,21 @@ class AddPlantForm(QDialog):
                 background-color: #ffffff;
             }
 
-            /* AREA PANAH */
+            /* Simplified dropdown area, removed complex SVG to fix parsing */
             QComboBox::drop-down {
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
-                width: 30px;
-                border-left-width: 0px;
+                width: 20px; /* Reduced width */
+                border-left-width: 1px; /* Added separator */
+                border-left-color: #ddd;
+                border-left-style: solid;
                 border-top-right-radius: 8px;
                 border-bottom-right-radius: 8px;
             }
             
-            /* GAMBAR PANAH SVG */
-            QComboBox::down-arrow {
-                image: url(data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>);
-                width: 14px;
-                height: 14px;
-            }
+            /* REMOVED: QComboBox::down-arrow with SVG image that caused parsing errors */
+            /* Qt will use its default arrow icon now, which is safer. */
 
-            /* ITEM LIST */
             QComboBox QAbstractItemView {
                 border: 1px solid #ddd;
                 background-color: white;
@@ -84,14 +89,48 @@ class AddPlantForm(QDialog):
                 outline: none;
             }
         """
+        
+        # Calendar styling for date picker (black month/year text)
+        self.calendar_stylesheet = """
+            QCalendarWidget {
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            QCalendarWidget QWidget { 
+                background-color: white;
+                color: #000;
+            }
+            QCalendarWidget QToolButton {
+                color: #000;
+                background-color: #f5f5f5;
+                border: none;
+                border-radius: 4px;
+                padding: 4px;
+                margin: 2px;
+            }
+            QCalendarWidget QToolButton:hover {
+                background-color: #e0e0e0;
+            }
+            QCalendarWidget QMenu {
+                color: #000;
+                background-color: white;
+                border: 1px solid #ddd;
+            }
+            QCalendarWidget QMenu::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+        """
 
+        self.scroll_filter = NoScrollEventFilter()
         self.init_ui()
         self.setup_species_completer()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(25, 25, 25, 25)
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(15)
 
         # --- HEADER ---
         header_layout = QHBoxLayout()
@@ -122,44 +161,85 @@ class AddPlantForm(QDialog):
 
         # --- FORM INPUT ---
         form_widgets_layout = QVBoxLayout()
-        form_widgets_layout.setSpacing(15)
+        # FIX: Increased main vertical spacing to 18px
+        form_widgets_layout.setSpacing(18) 
 
         label_style = "color: #555; font-size: 13px; font-weight: bold;"
         
         def create_input_group(label_text, input_widget):
-            group_layout = QVBoxLayout()
+            container = QWidget()
+            group_layout = QVBoxLayout(container)
             group_layout.setSpacing(6)
             lbl = QLabel(label_text)
             lbl.setStyleSheet(label_style)
-            
-            # Terapkan stylesheet utama ke widget input
-            input_widget.setStyleSheet(self.main_stylesheet)
-            
+
+            # Apply stylesheet
+            if isinstance(input_widget, (QLineEdit, QSpinBox, QDateEdit, QComboBox)):
+                input_widget.setStyleSheet(self.main_stylesheet)
+                # Install event filter to prevent scroll wheel from modifying values
+                input_widget.installEventFilter(self.scroll_filter)
+
+            # Ensure inputs have a sensible size policy to avoid overlapping
+            try:
+                input_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            except Exception:
+                pass
+
             group_layout.addWidget(lbl)
             group_layout.addWidget(input_widget)
-            return group_layout
+            return container
 
-        # A. Plant Name
+        # 1. Plant Name
         self.input_name = QLineEdit()
-        self.input_name.setPlaceholderText("e.g. My Monstera")
-        form_widgets_layout.addLayout(create_input_group("Plant Name", self.input_name))
+        self.input_name.setPlaceholderText("e.g. My Kitchen Basil")
+        form_widgets_layout.addWidget(create_input_group("Plant Name / Nickname", self.input_name))
 
-        # B. Species
+        # 2. Species (Auto-complete)
         self.input_species = QLineEdit()
-        self.input_species.setPlaceholderText("e.g. Monstera deliciosa")
-        form_widgets_layout.addLayout(create_input_group("Species", self.input_species))
+        self.input_species.setPlaceholderText("Start typing (e.g. Monstera...)")
+        form_widgets_layout.addWidget(create_input_group("Species", self.input_species))
 
-        # Helper Logic untuk Placeholder Dinamis
+        # 3. Age & Date (The Hybrid Approach)
+        stats_layout = QVBoxLayout()
+        stats_layout.setSpacing(30) 
+
+        # Row A: Date Acquired (The Anchor)
+        self.input_date = QDateEdit()
+        self.input_date.setCalendarPopup(True)
+        self.input_date.setDate(QDate.currentDate()) # Default to Today
+        self.input_date.setDisplayFormat("yyyy-MM-dd")
+        self.input_date.calendarWidget().setStyleSheet(self.calendar_stylesheet)
+        stats_layout.addWidget(create_input_group("Date Acquired/Planted", self.input_date))
+
+        # Row B: Initial Age & Height (Side by Side)
+        row_measurements = QHBoxLayout()
+        row_measurements.setSpacing(15)
+
+        # Initial Age (The Offset)
+        self.input_initial_age = QSpinBox()
+        self.input_initial_age.setRange(0, 240) 
+        self.input_initial_age.setSuffix(" months old")
+        self.input_initial_age.setToolTip("How old was the plant when you got it? (Estimate)")
+        row_measurements.addWidget(create_input_group("Est. Age at Acquisition", self.input_initial_age))
+
+        # Height
+        self.input_height = QSpinBox()
+        self.input_height.setRange(0, 1000) 
+        self.input_height.setSuffix(" cm")
+        row_measurements.addWidget(create_input_group("Current Height", self.input_height))
+        
+        stats_layout.addLayout(row_measurements)
+        
+        form_widgets_layout.addLayout(stats_layout)
+
+        # Helper Logic for ComboBox Placeholders
         def setup_combo_placeholder(combo, placeholder_text, items):
             model = QStandardItemModel()
-            
-            # 1. Item Placeholder (Warna abu-abu di list dropdown)
             item_placeholder = QStandardItem(placeholder_text)
             item_placeholder.setForeground(QColor("#888")) 
             item_placeholder.setSelectable(False)
             model.appendRow(item_placeholder)
             
-            # 2. Item Pilihan
             for text in items:
                 item = QStandardItem(text)
                 item.setForeground(QColor("#333"))
@@ -168,35 +248,23 @@ class AddPlantForm(QDialog):
             combo.setModel(model)
             combo.setView(QListView())
             
-            # 3. LOGIKA UPDATE PROPERTY
-            # Ini fungsi yang akan dipanggil saat index berubah
             def update_style():
                 is_placeholder = (combo.currentIndex() == 0)
-                
-                # Set properti kustom 'is_placeholder' ke True/False
                 combo.setProperty("is_placeholder", is_placeholder)
-                
-                # PENTING: Paksa Qt untuk memuat ulang style berdasarkan properti baru
                 combo.style().unpolish(combo)
                 combo.style().polish(combo)
 
-            # Hubungkan sinyal
             combo.currentIndexChanged.connect(update_style)
-            
-            # Set awal
             combo.setCurrentIndex(0)
-            update_style() # Panggil sekali di awal untuk set warna abu-abu
+            update_style()
 
-        # C. Growing Media
+        # 4. Growing Media
         self.combo_media = QComboBox()
         media_items = ["Soil", "Water (Hydroponic)", "Leca", "Sphagnum Moss", "Coco Coir"]
-        # Pasang ke layout dulu agar style bisa diaplikasikan
-        group_media = create_input_group("Growing Media", self.combo_media)
-        form_widgets_layout.addLayout(group_media)
-        # Baru setup logic placeholder
-        setup_combo_placeholder(self.combo_media, "Pick Growing Media...", media_items)
+        form_widgets_layout.addWidget(create_input_group("Growing Media", self.combo_media))
+        setup_combo_placeholder(self.combo_media, "Select Media...", media_items)
 
-        # D. Sunlight Habit
+        # 5. Sunlight Habit
         self.combo_sun = QComboBox()
         sun_items = [
             "Full Sun (6+ hours direct sun)",
@@ -205,14 +273,26 @@ class AddPlantForm(QDialog):
             "Shade (< 3 hours direct sun)",
             "Low Light (Artificial/Dim)"
         ]
-        group_sun = create_input_group("Sunlight Habit", self.combo_sun)
-        form_widgets_layout.addLayout(group_sun)
-        setup_combo_placeholder(self.combo_sun, "Pick Sunlight Habit...", sun_items)
+        form_widgets_layout.addWidget(create_input_group("Placement / Sunlight", self.combo_sun))
+        setup_combo_placeholder(self.combo_sun, "Select Sunlight...", sun_items)
 
-        main_layout.addLayout(form_widgets_layout)
-        main_layout.addStretch()
+        # 6. Initial Leaf Color (For initial diagnostics)
+        self.combo_color = QComboBox()
+        color_items = ["Green", "Yellow", "Brown/Crispy", "Pale/Faded", "Black/Mushy"]
+        form_widgets_layout.addWidget(create_input_group("Current Leaf Condition", self.combo_color))
+        setup_combo_placeholder(self.combo_color, "Select Leaf Color...", color_items)
 
-        # --- TOMBOL AKSI ---
+        # Wrap the form widgets in a scroll area to avoid overflow/hiding (only form scrolls, buttons stay fixed)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background-color: white; }")
+        scroll_content = QWidget()
+        scroll_content.setLayout(form_widgets_layout)
+        scroll.setWidget(scroll_content)
+
+        main_layout.addWidget(scroll, 1)  # Give scroll area stretch factor
+
+        # --- BUTTONS (Fixed at bottom, not scrollable) ---
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(12)
 
@@ -256,48 +336,81 @@ class AddPlantForm(QDialog):
         btn_layout.addWidget(self.btn_cancel)
         btn_layout.addWidget(self.btn_add)
 
-        main_layout.addLayout(btn_layout)
+        main_layout.addLayout(btn_layout, 0)
         self.setLayout(main_layout)
 
     def setup_species_completer(self):
-        species_list = [
-            "Monstera deliciosa", "Monstera adansonii", "Epipremnum aureum (Golden Pothos)", 
-            "Sansevieria trifasciata", "Ficus lyrata (Fiddle-leaf Fig)", "Zamioculcas zamiifolia (ZZ Plant)", 
-            "Calathea orbifolia", "Philodendron 'Pink Princess'", "Aloe vera", "Opuntia microdasys"
-        ]
+        """Fetches species list from SQLite database for auto-complete"""
+        species_list = []
+        
+        # Calculate the absolute path to the database
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(current_dir, '..', '..', 'data', 'plants.db')
+        db_path = os.path.normpath(db_path)
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT common_name FROM species")
+            rows = cursor.fetchall()
+            species_list = [row[0] for row in rows]
+            conn.close()
+        except sqlite3.Error as e:
+            print(f"Database Error (Path: {db_path}): {e}")
+            species_list = ["Snake Plant", "Monstera", "Pothos", "Aloe Vera"]
+
         completer = QCompleter(species_list, self)
         completer.setCaseSensitivity(Qt.CaseInsensitive)
         completer.setFilterMode(Qt.MatchContains)
         self.input_species.setCompleter(completer)
 
     def on_save_clicked(self):
+        # Validation
         nama = self.input_name.text().strip()
         species = self.input_species.text().strip()
         
         if not nama:
-            QMessageBox.warning(self, "Input Error", "Plant Name tidak boleh kosong!")
+            QMessageBox.warning(self, "Input Error", "Plant Name cannot be empty!")
             return
         if not species:
-            QMessageBox.warning(self, "Input Error", "Species tidak boleh kosong!")
+            QMessageBox.warning(self, "Input Error", "Species cannot be empty!")
             return
-            
         if self.combo_media.currentIndex() == 0:
-            QMessageBox.warning(self, "Input Error", "Silakan pilih Growing Media!")
+            QMessageBox.warning(self, "Input Error", "Please select Growing Media!")
             return
-            
         if self.combo_sun.currentIndex() == 0:
-            QMessageBox.warning(self, "Input Error", "Silakan pilih Sunlight Habit!")
+            QMessageBox.warning(self, "Input Error", "Please select Sunlight Habit!")
+            return
+        if self.combo_color.currentIndex() == 0:
+            QMessageBox.warning(self, "Input Error", "Please select Current Leaf Condition!")
             return
 
         self.accept()
 
     def get_data(self):
+        """
+        Returns the dictionary of data to be used by the main logic.
+        FIX: Includes the old keys ('name', 'species', 'media', 'sunlight_habit') 
+             for backward compatibility.
+        """
+        date_acquired_str = self.input_date.date().toString("yyyy-MM-dd")
+        nickname = self.input_name.text().strip()
+        species = self.input_species.text().strip()
+        media = self.combo_media.currentText()
         full_sunlight_text = self.combo_sun.currentText()
         clean_sunlight = full_sunlight_text.split(" (")[0]
 
         return {
-            "name": self.input_name.text().strip(),
-            "species": self.input_species.text().strip(),
-            "media": self.combo_media.currentText(),
+            "name": nickname,           
+            "species": species,
+            "media": media,
             "sunlight_habit": clean_sunlight,
+            "plant_nickname": nickname,
+            "species_name": species,
+            "growing_media": media,
+            "sunlight_condition": clean_sunlight,
+            "date_acquired": date_acquired_str,
+            "initial_age_months": self.input_initial_age.value(),
+            "current_height_cm": self.input_height.value(),
+            "current_leaf_color": self.combo_color.currentText()
         }
