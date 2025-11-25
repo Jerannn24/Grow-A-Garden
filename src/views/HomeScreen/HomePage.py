@@ -60,10 +60,10 @@ class HomePage(QWidget):
             p_name = plant.getPlantName()
             p_species = plant.getPlantSpecies()
             p_media = plant.getPlantMedia()
-            p_sun = plant.getLightingDuration() 
-            p_water = plant.getWateringFrequency()
             p_phase = plant.getPlantPhase()
             p_harvest = plant.getHarvestEstim()
+            p_sun = plant.getLightingDuration() 
+            p_water = plant.getWateringFrequency()
 
             stats = {"🌱": p_media, "🔄": p_phase, "📅": p_harvest, "☀️": p_sun, "💧": p_water}
             

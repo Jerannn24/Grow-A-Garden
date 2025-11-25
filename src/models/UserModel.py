@@ -1,7 +1,7 @@
 import sqlite3
 from typing import Optional, List, Any, Tuple
 import os
-
+from datetime import datetime 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
 DB_FILE_PATH = os.path.join(PROJECT_ROOT, 'data', 'app.db')
@@ -17,7 +17,8 @@ class UserModel:
                  status: str = "active",
                  location: str = "unknown",
                  notificationPreferences: str = "all",
-                 notificationTime: str = "08:00"):
+                 notificationTime: str = "08:00",
+                 timeCreated: Optional[str] = None):
         self.userID = userID
         self.username = username
         self.password = password
@@ -29,8 +30,13 @@ class UserModel:
         self.location = location
         self.notificationPreferences = notificationPreferences
         self.notificationTime = notificationTime
-        
-    @staticmethod
+        if timeCreated is None:
+            # Set creation time if not provided, assuming this is a new model instance
+            self.timeCreated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            self.timeCreated = timeCreated
+            
+    # Removed @staticmethod as it accesses instance variable self.userID
     def getUserID(self):
         return self.userID
     
@@ -55,14 +61,17 @@ class UserModel:
     def getStatus(self):
         return self.status
         
-    def getLocation(self):   
+    def getLocation(self):  
         return self.location
         
-    def getNotificationPreferences(self):   
+    def getNotificationPreferences(self):  
         return self.notificationPreferences
         
     def getNotificationTime(self): 
         return self.notificationTime 
+    
+    def getTimeCreated(self):
+        return self.timeCreated
     
     @staticmethod
     def get_conn() -> sqlite3.Connection:
@@ -83,7 +92,8 @@ class UserModel:
             status TEXT NOT NULL DEFAULT 'active',
             location TEXT DEFAULT 'unknown',
             notificationPreferences TEXT DEFAULT 'all',
-            notificationTime TEXT DEFAULT '08:00'
+            notificationTime TEXT DEFAULT '08:00',
+            timeCreated TEXT DEFAULT CURRENT_TIMESTAMP -- timeCreated added
         )
         """
         conn.execute(query)
@@ -100,8 +110,9 @@ class UserModel:
         self.createTable(conn) 
 
         try:
-            query = "INSERT INTO users (username, email, password, location, profileInfo) VALUES (?, ?, ?, ?, ?)"
-            conn.execute(query, (username, email, password, location, profileInfo))
+            # Added timeCreated to the insert query to ensure consistency
+            query = "INSERT INTO users (username, email, password, location, profileInfo, timeCreated) VALUES (?, ?, ?, ?, ?, ?)"
+            conn.execute(query, (username, email, password, location, profileInfo, self.timeCreated))
             conn.commit()
             return True, "Registration Sucess!"
         except sqlite3.IntegrityError:
@@ -109,14 +120,17 @@ class UserModel:
 
     def loginUser(self, email: str, password: str) -> Tuple[Optional["UserModel"], str]:
         conn = self.get_conn()
+        # Query selects all columns, including timeCreated
         query = "SELECT * FROM users WHERE email = ? AND password = ?"
         cursor = conn.execute(query, (email, password))
         userRow = cursor.fetchone()
 
         if userRow:
-            userInstance = UserModel.fromRowSQL(userRow)
+            # fromRowSQL must handle 12 columns now
+            userInstance = UserModel.fromRowSQL(userRow) 
             if userInstance:
-                userInstance.password = ""
+                # Security measure: do not keep password in the returned object
+                userInstance.password = "" 
             return userInstance, "Login Success!"
         else:
             return None, "Wrong Email or password!"
@@ -174,16 +188,19 @@ class UserModel:
         
     @classmethod
     def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
-        if row is None or len(row) < 11:
+        # CRITICAL FIX: The 'users' table now has 12 columns (index 0 to 11)
+        if row is None or len(row) < 12: 
             return None
         
         try:
             return cls(
                 userID=row[0], username=row[1], password=row[2], email=row[3], 
                 profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7], 
-                location=row[8], notificationPreferences=row[9], notificationTime=row[10]
+                location=row[8], notificationPreferences=row[9], notificationTime=row[10],
+                timeCreated=row[11] # Accessing the 12th column (index 11)
             )
-        except Exception:
+        except Exception as e:
+            print(f"Error creating UserModel from row: {e}")
             return None
 
     @classmethod

@@ -207,7 +207,6 @@ class PlantDetails(QWidget):
     def populate_data(self, plant_obj):
         self.lbl_name.setText(plant_obj.getPlantName())
         self.lbl_species.setText(plant_obj.getPlantSpecies())
-        self.lbl_water_val.setText(plant_obj.getWateringFrequency())
         self.lbl_sun_val.setText(plant_obj.getLightingDuration())
         
         icon = getattr(plant_obj, 'icon', '🌿') 

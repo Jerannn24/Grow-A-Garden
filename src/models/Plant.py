@@ -7,8 +7,8 @@ class Plant:
     def __init__(self, userID, plantID, plantName, plantSpecies, 
                  plantingStartDate, plantMedia=None, waterFreqPerWeek=None, 
                  lightingDuration=None, waterVol=None, dailyLightingReq=None, 
-                 fertilizerFreqPerWeek=None, fertilizerVol=None, plantPhase=None, height=0, 
-                 problem=None, harvestEstim=None, leafColor=None):
+                 fertilizerFreqPerWeek=None, fertilizerVol=None, plantPhase=None,
+                 height=0, problem=None, harvestEstim=None, leafColor=None):
         
         self.userID = userID
         self.plantID = plantID
@@ -35,13 +35,19 @@ class Plant:
 
     @staticmethod
     def _get_db_connection():
+        folder = os.path.dirname(DB_FILE_PATH)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
         conn = sqlite3.connect(DB_FILE_PATH)
         conn.row_factory = sqlite3.Row
+        Plant.initialize_table(conn) 
+        
         return conn
 
     @staticmethod
-    def initialize_table():
-        conn = Plant._get_db_connection()
+    def initialize_table(existing_conn=None):
+        conn = existing_conn if existing_conn else sqlite3.connect(DB_FILE_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS plants (
@@ -51,14 +57,17 @@ class Plant:
                 plantSpecies TEXT,
                 plantingStartDate TEXT,
                 plantMedia TEXT,
+                plantPhase TEXT,
                 lightingDuration TEXT,
                 height REAL,
+                harvestEstim TEXT,
                 problem TEXT,
-                leafColor TEXT,
+                leafColor TEXT
             )
         ''')
         conn.commit()
-        conn.close()
+        if not existing_conn:
+            conn.close()
 
     def setRequirements(self):
         conn = sqlite3.connect(GUIDE_FILE_PATH)
@@ -207,15 +216,29 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
         query = '''
             INSERT INTO plants (
                 plantID, userID, plantName, plantSpecies, plantingStartDate,
-                plantMedia, lightingDuration, height, problem, leafColor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                plantMedia, plantPhase, lightingDuration, height, harvestEstim, 
+                problem, leafColor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         
-        date_str = self.plantingStartDate.strftime('%Y-%m-%d')
+        if isinstance(self.plantingStartDate, datetime):
+            date_str = self.plantingStartDate.strftime('%Y-%m-%d')
+        else:
+            date_str = self.plantingStartDate
         
         values = (
-            self.plantID, self.userID, self.plantName, self.plantSpecies, date_str,
-            self.plantMedia, self.lightingDuration, self.height, self.problem, self.leafColor
+            self.plantID,       # 1
+            self.userID,        # 2
+            self.plantName,     # 3
+            self.plantSpecies,  # 4
+            date_str,           # 5
+            self.plantMedia,    # 6
+            self.plantPhase,    # 7
+            self.lightingDuration, # 8
+            self.height,        # 9
+            self.harvestEstim,  # 10
+            self.problem,       # 11
+            self.leafColor      # 12
         )
         
         try:
@@ -267,6 +290,9 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
     def getAllPlant(cls, userID):
         conn = cls._get_db_connection()
         cursor = conn.cursor()
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
         query = "SELECT * FROM plants WHERE userID = ?"
         cursor.execute(query, (userID,))
         rows = cursor.fetchall()
@@ -284,8 +310,31 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
                 lightingDuration=row['lightingDuration'],
                 height=row['height'],
                 problem=row['problem'],
-                leafColor=row['leafColor']
+                leafColor=row['leafColor'],
+                plantPhase=row['plantPhase'],
+                harvestEstim=row['harvestEstim'],
             )
             plant_list.append(plant_obj)
-        
         return plant_list
+    
+    @classmethod
+    def countUserPlants(cls, userID):
+        conn = None
+        try:
+            conn = cls._get_db_connection()
+            cursor = conn.cursor()
+            
+            # Kueri SQL untuk menghitung baris berdasarkan userID
+            query = "SELECT COUNT(*) FROM plants WHERE userID = ?"
+            cursor.execute(query, (userID,))
+            
+            # Ambil hasilnya. fetchone()[0] akan mengambil nilai COUNT.
+            count = cursor.fetchone()[0]
+            
+            return count
+        except sqlite3.Error as e:
+            print(f"[DB Error] Gagal menghitung tanaman untuk userID {userID}: {e}")
+            return 0
+        finally:
+            if conn:
+                conn.close()

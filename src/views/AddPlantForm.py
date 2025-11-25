@@ -201,7 +201,6 @@ class AddPlantForm(QDialog):
 
         # 3. Age & Date (The Hybrid Approach)
         stats_layout = QVBoxLayout()
-        # FIX: Increased spacing between Date Acquired and Age/Height row to 30px
         stats_layout.setSpacing(30) 
 
         # Row A: Date Acquired (The Anchor)
@@ -337,7 +336,7 @@ class AddPlantForm(QDialog):
         btn_layout.addWidget(self.btn_cancel)
         btn_layout.addWidget(self.btn_add)
 
-        main_layout.addLayout(btn_layout, 0)  # Add buttons with no stretch (fixed position)
+        main_layout.addLayout(btn_layout, 0)
         self.setLayout(main_layout)
 
     def setup_species_completer(self):
@@ -398,31 +397,20 @@ class AddPlantForm(QDialog):
         nickname = self.input_name.text().strip()
         species = self.input_species.text().strip()
         media = self.combo_media.currentText()
-        # Ambil nilai sunlight
-        sunlight = self.combo_sun.currentText() 
+        full_sunlight_text = self.combo_sun.currentText()
+        clean_sunlight = full_sunlight_text.split(" (")[0]
 
         return {
-            # FIX: Included old keys for backward compatibility
             "name": nickname,           
             "species": species,
             "media": media,
-            "sunlight_habit": sunlight, # <--- PERBAIKAN BARU
-            
-            # New, more descriptive keys
+            "sunlight_habit": clean_sunlight,
             "plant_nickname": nickname,
             "species_name": species,
             "growing_media": media,
-            "sunlight_condition": sunlight,
-            
+            "sunlight_condition": clean_sunlight,
             "date_acquired": date_acquired_str,
             "initial_age_months": self.input_initial_age.value(),
             "current_height_cm": self.input_height.value(),
             "current_leaf_color": self.combo_color.currentText()
         }
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    form = AddPlantForm()
-    if form.exec_() == QDialog.Accepted:
-        print(form.get_data())
-    sys.exit(app.exec_())
