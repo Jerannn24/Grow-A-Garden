@@ -253,7 +253,6 @@ class PostManager(QWidget):
             QListWidget::item:hover {
                 background-color: #F9F9F9;
                 border-color: #007F00;
-                cursor: pointer;
             }
             QListWidget::item:selected {
                 background-color: #E8F5E9;
@@ -289,6 +288,11 @@ class PostManager(QWidget):
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row
             Post.create_table(self.conn)
+            try:
+                from models.Report import Report
+                Report.create_table(self.conn)
+            except ImportError:
+                pass
         except Exception as e:
             print(f"❌ Error connecting to database: {e}")
             self.conn = None
@@ -411,5 +415,8 @@ class PostManager(QWidget):
         if not parent_post:
             return
         author = Post.getUsernameByID(self.conn, parent_post.getAuthor())
-        title = parent_post.getTitle() or "(no title)"
+        if getattr(parent_post, 'isAvailable', 1) == 0:
+            title = "Unavailable"
+        else:
+            title = parent_post.getTitle() or "(No Title)"
         self.create_post_widget.open_as_reply(parent_post_id=post_id, parent_title=title, parent_author=author)
