@@ -4,7 +4,7 @@ from typing import Optional, List, Any, Tuple
 class Post:
     def __init__(self, postID: Optional[int]=None, userID: Optional[int]=None, repliedPostID: Optional[int]=None,
                  title: str = "", content: str = "", media: str = "", timeCreated: str = "", viewCount: int = 0,
-                 likeCount: int = 0):
+                 likeCount: int = 0, isAvailable: int = 1):
         self.postID = postID
         self.userID = userID
         self.repliedPostID = repliedPostID
@@ -14,6 +14,7 @@ class Post:
         self.timeCreated = timeCreated
         self.viewCount = viewCount
         self.likeCount = likeCount
+        self.isAvailable = isAvailable
 
     def getPostID(self) -> Optional[int]:
         return self.postID
@@ -55,6 +56,14 @@ class Post:
             return None
 
         try:
+            # Safely read optional `isAvailable` column if present
+            def _get(key, default=None):
+                try:
+                    # sqlite3.Row supports keys
+                    return row[key] if key in row.keys() and row[key] is not None else default
+                except Exception:
+                    return default
+
             return cls(postID=row["postID"],
                        userID=row["userID"],
                        repliedPostID=row["repliedPostID"],
@@ -63,9 +72,12 @@ class Post:
                        media=row["media"],
                        timeCreated=row["timeCreated"],
                        viewCount=row["viewCount"],
-                       likeCount=row["likeCount"])
+                       likeCount=row["likeCount"],
+                       isAvailable=_get("isAvailable", 1))
         except Exception:
             try:
+                # tuple-style row: optional isAvailable could be at index 9
+                isAvail = row[9] if len(row) > 9 else 1
                 return cls(postID=row[0],
                            userID=row[1],
                            repliedPostID=row[2],
@@ -74,7 +86,8 @@ class Post:
                            media=row[5],
                            timeCreated=row[6],
                            viewCount=row[7],
-                           likeCount=row[8])
+                           likeCount=row[8],
+                           isAvailable=isAvail)
             except Exception:
                 return None
 
@@ -90,8 +103,9 @@ class Post:
           content TEXT,
           media TEXT,
           timeCreated TEXT,
-          viewCount INTEGER DEFAULT 0,
-          likeCount INTEGER DEFAULT 0
+                    viewCount INTEGER DEFAULT 0,
+                    likeCount INTEGER DEFAULT 0,
+                    isAvailable INTEGER DEFAULT 1
         );
         """)
         
@@ -104,6 +118,19 @@ class Post:
         );
         """)
         conn.commit()
+
+    @classmethod
+    def ensure_availability_column(cls, conn: sqlite3.Connection):
+        """Ensure the `isAvailable` column exists (safe for older DBs)."""
+        try:
+            cur = conn.execute("PRAGMA table_info(postList)")
+            cols = [r[1] for r in cur.fetchall()]
+            if 'isAvailable' not in cols:
+                conn.execute("ALTER TABLE postList ADD COLUMN isAvailable INTEGER DEFAULT 1")
+                conn.commit()
+        except Exception:
+            # don't block operation on migration failure
+            pass
 
     def createPost(self, conn: sqlite3.Connection):
         Post.create_table(conn)
@@ -122,6 +149,19 @@ class Post:
         cur.execute("DELETE FROM postList WHERE postID = ?", (self.postID,))
         cur.execute("DELETE FROM postLikes WHERE postID = ?", (self.postID,))
         conn.commit()
+
+    def mark_unavailable(self, conn: sqlite3.Connection):
+        """Soft-remove the post by marking it as unavailable."""
+        if self.postID is None:
+            return
+        try:
+            Post.ensure_availability_column(conn)
+            cur = conn.cursor()
+            cur.execute("UPDATE postList SET isAvailable = 0 WHERE postID = ?", (self.postID,))
+            conn.commit()
+            self.isAvailable = 0
+        except Exception:
+            pass
 
     def incViewCount(self, conn: sqlite3.Connection):
         self.viewCount += 1
@@ -213,6 +253,16 @@ class Post:
         cur.execute("DELETE FROM postList WHERE postID = ?", (post_id,))
         cur.execute("DELETE FROM postLikes WHERE postID = ?", (post_id,))
         conn.commit()
+
+    @classmethod
+    def set_unavailable_by_id(cls, conn: sqlite3.Connection, post_id: int) -> None:
+        try:
+            cls.ensure_availability_column(conn)
+            cur = conn.cursor()
+            cur.execute("UPDATE postList SET isAvailable = 0 WHERE postID = ?", (post_id,))
+            conn.commit()
+        except Exception:
+            pass
 
     @classmethod
     def get_all_posts(cls, conn: sqlite3.Connection, order_by: str = "timeCreated", limit: Optional[int] = None) -> List["Post"]:
