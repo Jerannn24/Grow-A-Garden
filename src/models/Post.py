@@ -56,10 +56,9 @@ class Post:
             return None
 
         try:
-            # Safely read optional `isAvailable` column if present
             def _get(key, default=None):
                 try:
-                    # sqlite3.Row supports keys
+
                     return row[key] if key in row.keys() and row[key] is not None else default
                 except Exception:
                     return default
@@ -76,7 +75,6 @@ class Post:
                        isAvailable=_get("isAvailable", 1))
         except Exception:
             try:
-                # tuple-style row: optional isAvailable could be at index 9
                 isAvail = row[9] if len(row) > 9 else 1
                 return cls(postID=row[0],
                            userID=row[1],
@@ -129,7 +127,7 @@ class Post:
                 conn.execute("ALTER TABLE postList ADD COLUMN isAvailable INTEGER DEFAULT 1")
                 conn.commit()
         except Exception:
-            # don't block operation on migration failure
+
             pass
 
     def createPost(self, conn: sqlite3.Connection):
