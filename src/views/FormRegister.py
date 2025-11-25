@@ -1,16 +1,17 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect
+    QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect,
+    QMessageBox 
 )
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtCore import Qt, QByteArray, pyqtSignal
+from PyQt5.QtCore import Qt, QByteArray, pyqtSignal, QSize, QTimer 
 
 class RegisterForm(QWidget):
-    switchToLoginRequested = pyqtSignal()   
+    switchToLoginRequested = pyqtSignal()  
     registerRequested = pyqtSignal(str, str, str, str, str) 
-    errorDisplay = pyqtSignal(str)
+    errorDisplay = pyqtSignal(str) 
     
     def __init__(self):
         super().__init__()
@@ -29,16 +30,87 @@ class RegisterForm(QWidget):
         self.errorLabel = QLabel("")
         self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
         
-            
         mainLayout = QHBoxLayout(self)
         
         self.leftPanel = self._createLeftPanel()
         mainLayout.addWidget(self.leftPanel, 1) 
         
-        self._setupConnections()
         self.rightPanel = self._createRightPanel()
         mainLayout.addWidget(self.rightPanel, 1)
         
+        self._setupConnections() 
+        
+    def displayError(self, message):
+        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
+        
+        msgBox = QMessageBox() 
+        
+        msgBox.setIcon(QMessageBox.NoIcon) 
+        msgBox.setWindowTitle("Registration Failed")
+        msgBox.setText("❌ Registrasi Gagal")
+        msgBox.setInformativeText(message) 
+        msgBox.setStandardButtons(QMessageBox.Ok)
+        
+        msgBox.setFixedSize(QSize(600, 250)) 
+        
+        msgBox.setStyleSheet("""
+            QMessageBox {
+                background-color: white; 
+                border: none; 
+                border-radius: 16px; 
+                padding: 15px;
+                color: #333333; 
+                font-family: 'Geist', sans-serif;
+            }
+            
+            /* Area pesan utama */
+            QMessageBox::message {
+                padding: 15px 30px 15px 30px; 
+                border-left: 5px solid #e53935; /* Garis aksen merah di kiri */
+                margin-left: 0px; 
+                margin-top: 10px;
+                margin-bottom: 20px;
+                background-color: #fffafa; 
+            }
+
+            QMessageBox QLabel {
+                color: #444444; 
+                font-size: 14px;
+                padding: 0;
+            }
+            
+            /* Judul/Teks utama */
+            QMessageBox QLabel:first-child {
+                color: #e53935; 
+                font-size: 18px;
+                font-weight: 700;
+                margin-bottom: 5px;
+            }
+            
+            QMessageBox QPushButton {
+                background-color: #e53935; 
+                color: white;
+                border-radius: 8px;
+                padding: 10px 25px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 100px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #c62828; 
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect(msgBox)
+        shadow.setBlurRadius(40) 
+        shadow.setXOffset(0)
+        shadow.setYOffset(10)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        msgBox.setGraphicsEffect(shadow)
+
+        msgBox.exec_() 
+
+
     def _createLeftPanel(self):
         frame = QFrame()
         frame.setStyleSheet("background-color: #f7f7f7;")
@@ -52,9 +124,15 @@ class RegisterForm(QWidget):
         
         iconToAdd = None 
         svgWidget = QSvgWidget() 
-        svgWidget.load(svgFilePath)
         
-        if svgWidget.renderer().isValid():
+        try:
+            with open(svgFilePath, 'rb') as f:
+                 svgData = f.read()
+            svgWidget.load(QByteArray(svgData))
+        except FileNotFoundError:
+            svgWidget = None
+        
+        if svgWidget and svgWidget.renderer().isValid():
             iconToAdd = svgWidget
             iconToAdd.setFixedSize(iconSize, iconSize)
         else:
@@ -166,7 +244,6 @@ class RegisterForm(QWidget):
             if isPassword:
                 inputLine.setEchoMode(QLineEdit.Password)
             
-            # Styling: Input Field Modern
             inputLine.setStyleSheet("""
                 QLineEdit {
                     padding: 14px;
@@ -211,7 +288,6 @@ class RegisterForm(QWidget):
         signupButton = QPushButton("Sign Up")
         signupButton.setFont(QFont('Geist', 14, QFont.Bold))
         
-        # Styling: Tombol dan Margin
         signupButton.setStyleSheet("""
             QPushButton {
                 background-color: #076804;
@@ -227,22 +303,12 @@ class RegisterForm(QWidget):
         """)
         
         signupButton.setCursor(Qt.PointingHandCursor)
-        signupButton.clicked.connect(lambda: 
-            self.registerRequested.emit(
-                self.inputName.text(),        
-                self.inputEmail.text(),       
-                self.inputPass.text(),        
-                self.inputLocation.text(),    
-                self.inputConfirm.text()      
-            )
-        )
         formLayout.addWidget(signupButton)
         
         loginLink = QLabel('Sudah punya akun? <a href="#" style="color: #076804; text-decoration: none;">Masuk di sini</a>')
-        loginLink.setOpenExternalLinks(False) # 
+        loginLink.setOpenExternalLinks(False) 
         loginLink.setAlignment(Qt.AlignCenter)
         loginLink.setCursor(Qt.PointingHandCursor)
-        loginLink.linkActivated.connect(self.switchToLoginRequested.emit)
         formLayout.addWidget(loginLink)
         
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -254,19 +320,22 @@ class RegisterForm(QWidget):
         self.inputConfirm = inputConfirm
         self.signupButton = signupButton
         self.loginLink = loginLink
+        
         centerLayout.addWidget(frame)
         return centerWidget
     
     def _setupConnections(self):
+        self.errorDisplay.connect(self.displayError)
+        
         self.loginLink.linkActivated.connect(self.switchToLoginRequested.emit)
         
         self.signupButton.clicked.connect(lambda: 
             self.registerRequested.emit(
-                self.inputName.text(),        
-                self.inputEmail.text(),       
-                self.inputPass.text(),        
-                self.inputLocation.text(),    
-                self.inputConfirm.text()      
+                self.inputName.text(),      
+                self.inputEmail.text(),     
+                self.inputPass.text(),      
+                self.inputLocation.text(),  
+                self.inputConfirm.text()    
             )
         )
     
@@ -283,4 +352,17 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = RegisterForm()
     window.showMaximized() 
+    
+    def handle_register(name, email, password, location, confirm):
+        print(f"Registration attempt for: {name}, {email}")
+        
+        if password != confirm:
+            message = "Password dan Konfirmasi Password tidak sama. Mohon periksa kembali."
+        else:
+            message = "Akun dengan email ini sudah terdaftar. Gunakan email lain atau login."
+            
+        QTimer.singleShot(500, lambda: window.errorDisplay.emit(message))
+
+    window.registerRequested.connect(handle_register)
+    
     sys.exit(app.exec_())

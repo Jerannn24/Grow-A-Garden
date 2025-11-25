@@ -1,13 +1,9 @@
-# File: controller/AccountManager.py
-
 import sys
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from PyQt5.QtCore import Qt
 from typing import Optional
 
-# Import Model
 from models.UserModel import UserModel 
-# Import Views 
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
 from views.FormChangePassword import ChangePasswordForm

@@ -71,10 +71,8 @@ class PlantManager:
                 
             except Exception as db_error:
                 print(f"Manager DB ERROR: {db_error}")
-                # Jika DB gagal, kita throw error agar tidak lanjut ke append
                 raise db_error 
 
-            # 3. Update List Lokal (Hanya jika DB sukses)
             self.plantList.append(new_plant)
             print("--- DEBUG ON ADD ---")
             print(f"ID Objek PlantManager (saat add): {id(self)}")
@@ -85,7 +83,7 @@ class PlantManager:
             print("------------------------------------------------")
             print(f"Manager GAGAL Menambah Tanaman: {e}")
             print("Detail Error:")
-            traceback.print_exc() # Ini akan memberitahu kita baris mana yang salah
+            traceback.print_exc() 
             print("------------------------------------------------")
 
 

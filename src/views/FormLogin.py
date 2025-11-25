@@ -1,19 +1,22 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
-    QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect
+    QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect,
+    QMessageBox 
 )
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtCore import Qt, QByteArray, pyqtSignal
+from PyQt5.QtCore import Qt, QByteArray, pyqtSignal, QTimer, QPoint, QSize
 
 
 class LoginForm(QWidget):
+    # Signals
     switchToRegisterRequested = pyqtSignal()
     switchToHomeScreen = pyqtSignal() 
     switchToChangePassword = pyqtSignal()
     loginRequested = pyqtSignal(str, str)
-    errorDisplay = pyqtSignal(str)
+    errorDisplay = pyqtSignal(str) 
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Grow a Garden - Login")
@@ -22,18 +25,17 @@ class LoginForm(QWidget):
 
         mainLayout = QHBoxLayout(self)
         
-        self.leftPanel = self._createLeftPanel()
-        mainLayout.addWidget(self.leftPanel, 1) 
-        
-        self.rightPanel = self._createRightPanel()
-        mainLayout.addWidget(self.rightPanel, 1)
         self.inputEmail = QLineEdit()
         self.inputPass = QLineEdit() 
         self.loginButton = QPushButton() 
         self.signupLink = QLabel() 
         self.forgotLink = QLabel()
-        self.errorLabel = QLabel("")
-        self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
+        
+        self.leftPanel = self._createLeftPanel()
+        mainLayout.addWidget(self.leftPanel, 1) 
+        
+        self.rightPanel = self._createRightPanel()
+        mainLayout.addWidget(self.rightPanel, 1)
         
         self._setupConnections()
        
@@ -50,9 +52,15 @@ class LoginForm(QWidget):
         
         iconToAdd = None 
         svgWidget = QSvgWidget() 
-        svgWidget.load(svgFilePath)
         
-        if svgWidget.renderer().isValid():
+        try:
+            with open(svgFilePath, 'rb') as f:
+                 svgData = f.read()
+            svgWidget.load(QByteArray(svgData))
+        except FileNotFoundError:
+            svgWidget = None
+        
+        if svgWidget and svgWidget.renderer().isValid():
             iconToAdd = svgWidget
             iconToAdd.setFixedSize(iconSize, iconSize)
         else:
@@ -163,7 +171,6 @@ class LoginForm(QWidget):
             if isPassword:
                 inputLine.setEchoMode(QLineEdit.Password)
             
-            # Styling Input Field
             inputLine.setStyleSheet("""
                 QLineEdit {
                     padding: 14px;
@@ -180,7 +187,7 @@ class LoginForm(QWidget):
             
             return label, inputLine
 
-        # Email (menggunakan placeholder Bahasa Indonesia)
+        # Email
         labelEmail, inputEmail = createFormField("Email", "nama@example.com")
         formLayout.addWidget(labelEmail)
         formLayout.addWidget(inputEmail)
@@ -210,15 +217,12 @@ class LoginForm(QWidget):
         """)
         
         loginButton.setCursor(Qt.PointingHandCursor)
-        loginButton.clicked.connect(lambda: 
-            self.loginRequested.emit(inputEmail.text(), inputPass.text())
-        )
         formLayout.addWidget(loginButton)
+        
         forgotLink = QLabel('<a href="#" style="color: #076804; text-decoration: none;">Forgot your Password?</a>')
         forgotLink.setOpenExternalLinks(False)
         forgotLink.setAlignment(Qt.AlignCenter)
         forgotLink.setCursor(Qt.PointingHandCursor)
-        forgotLink.linkActivated.connect(self.switchToChangePassword.emit)
         formLayout.addWidget(forgotLink)
         
         # Pemisah 'atau'
@@ -230,9 +234,22 @@ class LoginForm(QWidget):
         orLabel = QLabel("or")
         orLabel.setAlignment(Qt.AlignCenter)
         orLayout = QHBoxLayout()
-        orLayout.addWidget(separator)
+        
+        leftLine = QFrame()
+        leftLine.setFrameShape(QFrame.HLine)
+        leftLine.setFrameShadow(QFrame.Sunken)
+        leftLine.setFixedHeight(1)
+        leftLine.setStyleSheet("background-color: #e0e0e0;")
+        
+        rightLine = QFrame()
+        rightLine.setFrameShape(QFrame.HLine)
+        rightLine.setFrameShadow(QFrame.Sunken)
+        rightLine.setFixedHeight(1)
+        rightLine.setStyleSheet("background-color: #e0e0e0;")
+        
+        orLayout.addWidget(leftLine)
         orLayout.addWidget(orLabel)
-        orLayout.addWidget(separator)
+        orLayout.addWidget(rightLine)
         
         formLayout.addLayout(orLayout)
         
@@ -240,7 +257,6 @@ class LoginForm(QWidget):
         signupLink.setOpenExternalLinks(False) 
         signupLink.setAlignment(Qt.AlignCenter)
         signupLink.setCursor(Qt.PointingHandCursor)
-        signupLink.linkActivated.connect(self.switchToRegisterRequested.emit)
         formLayout.addWidget(signupLink)
         
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
@@ -254,8 +270,81 @@ class LoginForm(QWidget):
         centerLayout.addWidget(frame)
         return centerWidget
     
+    def displayError(self, message):
+        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
+        
+        msgBox = QMessageBox() 
+        
+        msgBox.setIcon(QMessageBox.NoIcon) 
+        msgBox.setWindowTitle("Login Failed")
+        msgBox.setText("❌ Login Gagal")
+        msgBox.setInformativeText(message) 
+        msgBox.setStandardButtons(QMessageBox.Ok)
+        
+        msgBox.setFixedSize(QSize(600, 250)) 
+        
+        msgBox.setStyleSheet("""
+            QMessageBox {
+                background-color: white; 
+                border: none; /* Hilangkan border standar */
+                border-radius: 16px; /* Sudut lebih membulat */
+                padding: 15px;
+                color: #333333; 
+                font-family: 'Geist', sans-serif;
+            }
+            
+            /* Area pesan utama (QMessageBox::message) */
+            QMessageBox::message {
+                /* Gunakan padding untuk menciptakan ruang di dalam kotak pesan */
+                padding: 15px 30px 15px 30px; 
+                /* Border aksen merah di kiri */
+                border-left: 5px solid #e53935;
+                margin-left: 0px; 
+                margin-top: 10px;
+                margin-bottom: 20px;
+                background-color: #fffafa; /* Latar belakang sangat lembut */
+            }
+
+            QMessageBox QLabel {
+                color: #444444; 
+                font-size: 14px;
+                padding: 0;
+            }
+            
+            /* Style khusus untuk judul/teks utama (biasanya QLabel:first-child) */
+            QMessageBox QLabel:first-child {
+                color: #e53935; /* Aksen merah untuk judul */
+                font-size: 18px;
+                font-weight: 700;
+                margin-bottom: 5px;
+            }
+            
+            QMessageBox QPushButton {
+                background-color: #e53935; 
+                color: white;
+                border-radius: 8px;
+                padding: 10px 25px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 100px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #c62828; 
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect(msgBox)
+        shadow.setBlurRadius(40) 
+        shadow.setXOffset(0)
+        shadow.setYOffset(10)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        msgBox.setGraphicsEffect(shadow)
+
+        msgBox.exec_() 
+        
     def _setupConnections(self):
-        self.forgotLink.linkActivated.connect(lambda: self.switchToChangePassword.emit)
+        self.errorDisplay.connect(self.displayError) 
+        self.forgotLink.linkActivated.connect(self.switchToChangePassword.emit)
         self.signupLink.linkActivated.connect(self.switchToRegisterRequested.emit) 
         self.loginButton.clicked.connect(lambda: 
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
@@ -264,10 +353,16 @@ class LoginForm(QWidget):
     def clearForm(self):
         self.inputEmail.clear()
         self.inputPass.clear()
-        self.errorLabel.clear() 
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = LoginForm()
-    window.showMaximized() 
+    window.showMaximized()
+    
+    def handle_login(email, password):
+        print(f"Login attempt: {email}, {password}")
+        QTimer.singleShot(500, lambda: window.errorDisplay.emit("Email atau password yang Anda masukkan tidak valid. Silakan periksa kembali kredensial Anda atau gunakan fitur lupa password."))
+
+    window.loginRequested.connect(handle_login)
+
     sys.exit(app.exec_())
