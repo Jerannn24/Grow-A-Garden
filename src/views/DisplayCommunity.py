@@ -43,6 +43,14 @@ class DisplayCommunity(QWidget):
         self.post_manager = PostManager(db_path=db_path)
         self.post_manager.postSelected.connect(self.post_manager.show_post)
         
+        # Initialize Report table
+        try:
+            from models.Report import Report
+            if self.post_manager.conn:
+                Report.create_table(self.post_manager.conn)
+        except ImportError:
+            pass
+        
         share_post_widget = SharePostWidget(post_manager=self.post_manager)
         layout.addWidget(share_post_widget)
         
