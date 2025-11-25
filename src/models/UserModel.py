@@ -5,6 +5,7 @@ from datetime import datetime
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(MODEL_DIR))
 DB_FILE_PATH = os.path.join(PROJECT_ROOT, 'data', 'app.db')
+GUIDE_FILE_PATH = os.path.join(PROJECT_ROOT, 'data', 'plants.db')
 
 class UserModel:
     def __init__(self,

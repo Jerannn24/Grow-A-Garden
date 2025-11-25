@@ -8,8 +8,20 @@ class AddPlantCard(QFrame):
     def __init__(self):
         super().__init__()
         self.setObjectName("AddCard")
-        self.setFixedSize(280, 320)
+        self.setFixedSize(350, 430)
         self.setCursor(Qt.PointingHandCursor) 
+
+        self.setStyleSheet("""
+            #AddCard {
+                background-color: #f9f9f9;
+                border: 2px dashed #cccccc;
+                border-radius: 15px;
+            }
+            #AddCard:hover {
+                background-color: #e6f7ff; /* Warna background saat hover (biru muda) */
+                border: 2px dashed #1890ff; /* Warna border saat hover (biru) */
+            }
+        """)
         
         layout = QVBoxLayout()
         layout.setAlignment(Qt.AlignCenter)
