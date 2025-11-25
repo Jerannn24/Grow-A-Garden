@@ -17,6 +17,12 @@ class PlantManager:
         self.user_db_path = DB_FILE_PATH
         self.guide_db_path = GUIDE_FILE_PATH
         self.plantList = []
+        print("Manager: Memeriksa tabel database...")
+        try:
+            Plant.initialize_table()
+            print("Manager: Tabel database siap.")
+        except Exception as e:
+            print(f"Manager CRITICAL ERROR: Gagal membuat tabel! {e}")
     
     def loadUserData(self, userID):
         print("Manager: Meminta Model mengambil semua data dari DB...")

@@ -35,19 +35,13 @@ class Plant:
 
     @staticmethod
     def _get_db_connection():
-        folder = os.path.dirname(DB_FILE_PATH)
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-
         conn = sqlite3.connect(DB_FILE_PATH)
         conn.row_factory = sqlite3.Row
-        Plant.initialize_table(conn) 
-        
         return conn
 
     @staticmethod
-    def initialize_table(existing_conn=None):
-        conn = existing_conn if existing_conn else sqlite3.connect(DB_FILE_PATH)
+    def initialize_table():
+        conn = Plant._get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS plants (
@@ -66,8 +60,7 @@ class Plant:
             )
         ''')
         conn.commit()
-        if not existing_conn:
-            conn.close()
+        conn.close()
 
     def setRequirements(self):
         conn = sqlite3.connect(GUIDE_FILE_PATH)
