@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, 
-                             QHBoxLayout, QFrame, QScrollArea, QSpacerItem, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem)
+                             QHBoxLayout, QFrame, QScrollArea, QSpacerItem, QSizePolicy, QStackedWidget, QListWidget, QListWidgetItem, QDialog)
 from PyQt5.QtCore import pyqtSignal, Qt, QSize
 from PyQt5.QtGui import QPixmap, QFont, QIcon
 import os
@@ -20,6 +20,13 @@ if TYPE_CHECKING:
 else:
     from models.Post import Post as PostModel
 
+try:
+    from views.ReportForm import ReportForm
+    from models.Report import Report
+except ImportError:
+    ReportForm = None
+    Report = None
+
 
 class DisplayPost(QWidget):
     likeRequested = pyqtSignal(int)
@@ -31,7 +38,18 @@ class DisplayPost(QWidget):
     def __init__(self, db_path: str = DB_FILE_PATH, parent=None):
         super().__init__(parent)
         self.post_id = None
-        self.conn = self.parent().conn if self.parent() and hasattr(self.parent(), 'conn') else None 
+        self.post_manager = None
+        current = parent
+        while current:
+            if hasattr(current, 'user_model') and hasattr(current, 'conn'):
+                self.post_manager = current
+                break
+            current = current.parent() if hasattr(current, 'parent') else None
+        
+        if self.post_manager and hasattr(self.post_manager, 'conn'):
+            self.conn = self.post_manager.conn
+        else:
+            self.conn = None
         self.icon_red = QIcon(ICON_RED_HEART)
         self.icon_grey = QIcon(ICON_GREY_HEART)
         self._init_ui() 
@@ -56,10 +74,33 @@ class DisplayPost(QWidget):
         header_title = QLabel("Post")
         header_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #333;")
 
+        # Report button (kanan atas)
+        self.report_btn = QPushButton("⚠️ Laporkan")
+        self.report_btn.setCursor(Qt.PointingHandCursor)
+        self.report_btn.setToolTip("Laporkan Post")
+        self.report_btn.setStyleSheet("""
+            QPushButton { 
+                border: 1px solid #FF6B6B;
+                font-size: 12px; 
+                color: #FF6B6B; 
+                background-color: white;
+                padding: 6px 12px;
+                border-radius: 6px;
+            }
+            QPushButton:hover { 
+                background-color: #FFF5F5;
+                color: #FF4444;
+                border-color: #FF4444;
+            }
+        """)
+        self.report_btn.clicked.connect(self._open_report_form)
+        self.report_btn.hide() 
+        
         header_layout.addWidget(self.back_btn)
         header_layout.addSpacing(10)
         header_layout.addWidget(header_title)
         header_layout.addStretch()
+        header_layout.addWidget(self.report_btn)
         
         self.main_layout.addWidget(header_frame)
 
@@ -274,6 +315,7 @@ class DisplayPost(QWidget):
             }
             QPushButton:hover { color: #007F00; background-color: #E8F5E9; border-radius: 20px; }
         """)
+        self.report_btn.hide()
         
     def _render_replies(self, replies: List[PostModel]):
         self.replies_list_widget.clear()
@@ -325,7 +367,11 @@ class DisplayPost(QWidget):
             parent = PostModel.get_by_id(self.conn, post.repliedPostID)
             if parent:
                 author = PostModel.getUsernameByID(self.conn, parent.getAuthor())
-                title = parent.getTitle() or "(no title)"
+
+                if getattr(parent, 'isAvailable', 1) == 0:
+                    title = "Unavailable"
+                else:
+                    title = parent.getTitle() or "(No Title)"
                 self.reply_from_lbl.setText(f"Reply from post \"{title}\" by {author}")
                 self.reply_from_frame.show()
             else:
@@ -334,8 +380,8 @@ class DisplayPost(QWidget):
             self.reply_from_frame.hide()
 
         author_name = None
-        if hasattr(self.parent(), 'user_model') and self.parent().user_model.userID == post.getAuthor():
-            author_name = self.parent().user_model.username
+        if self.post_manager and hasattr(self.post_manager, 'user_model') and self.post_manager.user_model and self.post_manager.user_model.userID == post.getAuthor():
+            author_name = self.post_manager.user_model.username
         elif self.conn:
             author_name = PostModel.getUsernameByID(self.conn, post.getAuthor())
 
@@ -346,6 +392,23 @@ class DisplayPost(QWidget):
         
         self.author_name_lbl.setText(author_name)
         self.author_handle_lbl.setText(handle)
+        
+        user_model = None
+        if self.post_manager and hasattr(self.post_manager, 'user_model'):
+            user_model = self.post_manager.user_model
+        
+        show_report_btn = False
+        if user_model and hasattr(user_model, 'userID'):
+            try:
+                user_id = user_model.userID
+                post_author_id = post.getAuthor()
+                
+                if user_id is not None and post_author_id is not None and user_id != post_author_id:
+                    show_report_btn = True
+            except Exception as e:
+                print(f"⚠️ Error checking report button visibility: {e}")
+        
+        self.report_btn.setVisible(show_report_btn)
         
         if post.getTitle():
             self.title_lbl.setText(post.getTitle())
@@ -363,9 +426,9 @@ class DisplayPost(QWidget):
 
         # ini buat nunjukin kalau post udah di like atau belum
         liked = False
-        if self.conn and hasattr(self.parent(), 'user_model') and self.parent().user_model:
+        if self.conn and self.post_manager and hasattr(self.post_manager, 'user_model') and self.post_manager.user_model:
             try:
-                liked = PostModel.has_user_liked(self.conn, post.getPostID(), self.parent().user_model.userID)
+                liked = PostModel.has_user_liked(self.conn, post.getPostID(), self.post_manager.user_model.userID)
             except Exception:
                 liked = False
 
@@ -407,3 +470,97 @@ class DisplayPost(QWidget):
                 self.media_container.hide()
         else:
             self.media_container.hide()
+    
+    def _open_report_form(self):
+        """Membuka form report untuk post ini."""
+        if self.post_id is None:
+            return
+        
+        user_model = None
+        if self.post_manager and hasattr(self.post_manager, 'user_model'):
+            user_model = self.post_manager.user_model
+        
+        if not user_model or not hasattr(user_model, 'userID') or not user_model.userID:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Peringatan", "Anda harus login untuk melaporkan post.")
+            return
+        
+        user_id = user_model.userID
+        
+        if self.conn and Report:
+            if Report.has_user_reported_post(self.conn, self.post_id, user_id):
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.information(self, "Info", "Anda sudah melaporkan post ini sebelumnya.")
+                return
+            
+            post = PostModel.get_by_id(self.conn, self.post_id)
+            if post and post.getAuthor() == user_id:
+                QMessageBox.warning(self, "Peringatan", "Anda tidak dapat melaporkan post Anda sendiri.")
+                return
+        
+        if ReportForm:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Laporkan Post")
+            dialog.setModal(True)
+            
+            report_form = ReportForm(self.post_id, dialog)
+
+            report_form.reportSubmitted.connect(
+                lambda post_id, violation, details: self._handle_report_submission(post_id, violation, details, dialog)
+            )
+            
+            layout = QVBoxLayout(dialog)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.addWidget(report_form)
+            
+            dialog.resize(500, 400)
+            dialog.exec_()
+    
+    def _handle_report_submission(self, post_id: int, violation_type: str, additional_details: str, dialog=None):
+        """Menangani submit report dari form."""
+        if not self.conn or not Report:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", "Koneksi database tidak tersedia.")
+            if dialog:
+                dialog.close()
+            return
+        
+        user_model = None
+        if self.post_manager and hasattr(self.post_manager, 'user_model'):
+            user_model = self.post_manager.user_model
+        
+        if not user_model or not hasattr(user_model, 'userID') or not user_model.userID:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Peringatan", "Anda harus login untuk melaporkan post.")
+            if dialog:
+                dialog.close()
+            return
+        
+        user_id = user_model.userID
+        
+        from PyQt5.QtCore import QDateTime
+        from datetime import datetime
+        
+        try:
+            Report.create_table(self.conn)
+            time_created = datetime.now().isoformat()
+            
+            report = Report(
+                postID=post_id,
+                reporterID=user_id,
+                violationType=violation_type,
+                additionalDetails=additional_details,
+                timeCreated=time_created,
+                status="pending"
+            )
+            report.create_report(self.conn)
+            
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Berhasil", "Laporan Anda telah dikirim. Terima kasih!")
+            
+            if dialog:
+                dialog.accept()
+            
+        except Exception as e:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", f"Gagal mengirim laporan: {e}")
