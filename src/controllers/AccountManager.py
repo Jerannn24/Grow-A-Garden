@@ -57,18 +57,17 @@ class AccountManager(QWidget):
     
     def handleLoginRequest(self, email, password):        
         user_instance, message = self.model.loginUser(email.strip(), password.strip())
-        
-        self.loginView.clearForm()
-
         if user_instance:
+            self.loginView.clearForm()
+
             self.currentUser = user_instance
             self.homeScreenView.set_current_user(self.currentUser)
             self.switchView('homescreen')
             print(f"✅ Login Sukses untuk: {self.currentUser.username} (ID: {self.currentUser.userID}). Pindah ke Homescreen.")
-                        
+
         else:
-             print(f"❌ Login Gagal: {message}")
-             self.loginView.errorDisplay.emit(message)
+            print(f"❌ Login Gagal: {message}")
+            self.loginView.errorDisplay.emit(message)
 
 
     def handleRegisterRequest(self, username, email, password, location, confirmPassword):
