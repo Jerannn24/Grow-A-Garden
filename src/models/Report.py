@@ -40,7 +40,7 @@ class Report:
         self.violationType = violationType
         self.additionalDetails = additionalDetails
         self.timeCreated = timeCreated
-        self.status = status  # pending, reviewed, dismissed, action_taken
+        self.status = status  
         self.adminAction = adminAction
         self.adminID = adminID
         self.actionTime = actionTime
@@ -93,8 +93,7 @@ class Report:
         
         try:
             if isinstance(row, sqlite3.Row):
-                # sqlite3.Row behaves like a mapping but doesn't implement .get(),
-                # so we access using keys inside helper function for defaults.
+
                 def _get(column, default=None):
                     return row[column] if column in row.keys() and row[column] is not None else default
 
@@ -146,9 +145,7 @@ class Report:
         if conn is None:
             return []
         
-        # Query untuk mendapatkan report yang diurutkan berdasarkan:
-        # 1. Jumlah report per post (DESC)
-        # 2. Waktu report (ASC - yang paling lama dulu)
+
         query = """
         SELECT r.*, COUNT(r2.reportID) as report_count
         FROM reports r
@@ -203,7 +200,6 @@ class Report:
         self.adminID = admin_id
         self.actionTime = datetime.now().isoformat()
         
-        # Update status berdasarkan action
         if action == "Laporan Tidak Valid":
             self.status = "dismissed"
         else:
@@ -217,7 +213,6 @@ class Report:
         """, (self.adminAction, self.adminID, self.actionTime, self.status, self.reportID))
         conn.commit()
         
-        # Update status semua report untuk post yang sama jika action diambil
         if self.status == "action_taken":
             cur.execute("""
                 UPDATE reports 
