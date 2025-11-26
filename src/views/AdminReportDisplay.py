@@ -426,8 +426,8 @@ class AdminReportDisplay(QWidget):
                         cur.execute("UPDATE users SET reportCount = reportCount + 1 WHERE userID = ?", (user.userID,))
                         info_msg = "Peringatan telah diberikan kepada pengguna."
                     self.conn.commit()
-                    try:
-                        if action != "Laporan Tidak Valid":
+                    if action != "Laporan Tidak Valid":
+                        try:
                             try:
                                 Post.set_unavailable_by_id(self.conn, report.postID)
                                 if info_msg:
@@ -435,16 +435,13 @@ class AdminReportDisplay(QWidget):
                                 else:
                                     info_msg = "Post terkait telah ditandai sebagai tidak tersedia."
                             except Exception:
-                                try:
-                                    Post.delete_by_id(self.conn, report.postID)
-                                    if info_msg:
-                                        info_msg = info_msg + "\nPost terkait telah dihapus."
-                                    else:
-                                        info_msg = "Post terkait telah dihapus."
-                                except Exception as e:
-                                    print(f"⚠️ Gagal menghapus/tandai post {report.postID}: {e}")
-                    except Exception as e:
-                        print(f"⚠️ Gagal memproses penghapusan/tandai post {report.postID}: {e}")
+                                Post.delete_by_id(self.conn, report.postID)
+                                if info_msg:
+                                    info_msg = info_msg + "\nPost terkait telah dihapus."
+                                else:
+                                    info_msg = "Post terkait telah dihapus."
+                        except Exception as e:
+                            print(f"⚠ Gagal memproses post {report.postID}: {e}")
                     if info_msg:
                         try:
                             parent = getattr(self, '_current_action_dialog', self)
@@ -463,5 +460,5 @@ class AdminReportDisplay(QWidget):
             self.detail_header.setText("Pilih laporan untuk melihat detail")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Gagal menerapkan tindakan: {e}")
+            QMessageBox.critical(self, "Error", f"Gagal menerapkan tindakan: {e}")
 
