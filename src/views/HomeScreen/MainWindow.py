@@ -81,9 +81,6 @@ class MainWindow(QMainWindow):
         self.settings_page = QWidget()
         
         self.reports_page = None
-        self._reports_placeholder = QWidget()
-        self._reports_placeholder.setVisible(False)
-        self.pages.addWidget(self._reports_placeholder) 
 
         self.setStyleSheet(STYLE_SHEET)
         # Tambahkan ke Stacked Widget
@@ -91,6 +88,11 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.community_page) # index 1 (Community)
         self.pages.addWidget(self.todo_page)      # index 2 (Todo)
         self.pages.addWidget(self.settings_page)  # index 3 (Settings)
+
+        # Placeholder for reports page so navigation index stays stable
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder)  # index 4 (placeholder)
 
         self.nav_buttons = self.sidebar.get_nav_buttons()
         self.nav_mapping = {
