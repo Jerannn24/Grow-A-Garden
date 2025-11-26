@@ -136,6 +136,46 @@ class Plant:
             return default_phase, default_harvest
         finally:
             conn.close()
+    
+    def calculate_harvest_estim(self):
+        """
+        Menghitung Tanggal Panen secara Real-Time
+        berdasarkan Database Referensi (GUIDE_FILE_PATH).
+        """
+        
+        # # DEBUGGG
+        # real_now = datetime.now()
+        # fake_today = real_now + timedelta(days=TIME_TRAVEL_DAYS)
+        # age_weeks_now = (fake_today - start_dt).days / 7
+
+        conn = sqlite3.connect(GUIDE_FILE_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            # Cari Species ID
+            cursor.execute("SELECT id FROM species WHERE common_name LIKE ?", (self.plantSpecies,))
+            row = cursor.fetchone()
+            if not row: return datetime.now()
+            
+            species_id = row[0]
+
+            # Cari Harvest Countdown
+            cursor.execute("SELECT min_time_to_harvest_days, max_time_to_harvest_days FROM harvest_info WHERE species_id = ?", (species_id,))
+            harvest_row = cursor.fetchone()
+            
+            if harvest_row:
+                avg_days = (harvest_row[0] + harvest_row[1]) / 2
+
+                target_date = self.plantingStartDate + timedelta(days=avg_days)
+                self.harvestEstim = target_date
+
+                return target_date
+            return datetime.now()
+        except Exception as e:
+            print(f"[Harvest Estimation Error] {e}")
+            return datetime.now()
+        finally:
+            conn.close()
 
     def setRequirements(self):
         conn = sqlite3.connect(GUIDE_FILE_PATH)
@@ -364,7 +404,7 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
         rows = cursor.fetchall()
         conn.close()
 
-        plant_list = []
+        plant_list: list[Plant] = []
         for row in rows:
             p_start_date_str = row['plantingStartDate']
             p_species = row['plantSpecies']

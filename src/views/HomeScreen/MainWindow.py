@@ -9,6 +9,7 @@ from .Sidebar import Sidebar
 from .AppHeader import AppHeader
 from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
+from controllers.ToDoListManager import ToDoListManager
 
 
 from models.UserModel import UserModel
@@ -82,7 +83,7 @@ class MainWindow(QMainWindow):
  
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
-        self.todo_page = QWidget() 
+        self.todo_page = ToDoListManager(self.current_user)
         self.settings_page = QWidget() 
         self.detail_page = PlantDetails()
 
@@ -121,6 +122,10 @@ class MainWindow(QMainWindow):
 
         self.home_page.openDetailRequested.connect(self.show_plant_details)
         self.detail_page.backRequested.connect(self.go_back_to_home)
+        
+        # Connect todo page back button
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.backRequested.connect(self.go_back_to_home)
     
         
     def displayProfile(self):       
@@ -150,6 +155,10 @@ class MainWindow(QMainWindow):
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
         
+        # Set user for todo list manager
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.set_current_user(user_model)
+        
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)
         
@@ -161,19 +170,26 @@ class MainWindow(QMainWindow):
         
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
+        
+        # Refresh todo list when switching to it
+        if index == 2 and isinstance(self.todo_page, ToDoListManager):
+             self.todo_page.refresh_tasks()
     
     def show_plant_details(self, plant_id):
         print(f"Navigasi ke Detail Tanaman ID: {plant_id}")
         
         target_plant = next((p for p in self.home_page.plant_manager.plantList if p.plantID == plant_id), None)
         
-        if target_plant:
-            self.detail_page.populate_data(target_plant)
+        if target_plant and self.current_user:
+            self.detail_page.populate_data(target_plant, self.current_user.getUserID())
             self.pages.setCurrentIndex(4) 
             for btn in self.nav_buttons.values():
                 btn.setChecked(False)
         else:
-            print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            if not target_plant:
+                print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            else:
+                print("Error: User belum login")
 
     def go_back_to_home(self):
         self._switch_page_and_update_sidebar(0, self.nav_buttons["home"])
