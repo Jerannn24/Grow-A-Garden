@@ -9,10 +9,13 @@ Usage:
 import sys
 import os
 
-# Add src directory to path
-SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
+# Ensure the package `models` (under the project's `src` folder) is importable when
+# running this script from `src/script`. The src directory is the parent of this
+# script's directory.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # .../src/script
+PROJECT_SRC = os.path.dirname(SCRIPT_DIR)  # .../src
+if PROJECT_SRC not in sys.path:
+    sys.path.insert(0, PROJECT_SRC)
 
 from models.UserModel import UserModel, DB_FILE_PATH
 import sqlite3
