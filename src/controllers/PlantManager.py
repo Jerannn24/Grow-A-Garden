@@ -41,21 +41,15 @@ class PlantManager:
         print("Manager: Memproses dataForm...", dataForm)
         
         try:
-            # 1. Hitung Tanggal & Umur
             acquired_date = datetime.strptime(dataForm["date_acquired"], "%Y-%m-%d")
             days_old_at_acquisition = dataForm["initial_age_months"] * 30
             planting_start_date = acquired_date - timedelta(days=days_old_at_acquisition)
 
-            # Tidak perlu hitung manual age_days_total di sini lagi karena helper di Plant sudah menghitungnya
-            
-            # 2. [PERBAIKAN DI SINI] 
-            # Panggil fungsi Static dari Class Plant, BUKAN self
             plant_phase, harvest_date_str = Plant.calculate_dynamic_attributes(
                 dataForm['species'], 
                 planting_start_date
             )
             
-            # 3. Buat Objek Plant
             new_plant = Plant(
                 userID=dataForm['userID'],
                 plantID=dataForm['plantID'],
@@ -67,20 +61,16 @@ class PlantManager:
                 height=dataForm.get('current_height_cm', 0),
                 leafColor=dataForm['current_leaf_color'],
                 
-                # Masukkan hasil hitungan tadi
                 plantPhase=plant_phase,
                 harvestEstim=harvest_date_str,
             )
             
-            # 4. Ambil kebutuhan air/pupuk (Opsional)
             new_plant.setRequirements()
             
-            # 5. Simpan ke Database
             print("Manager: Mencoba menyimpan ke Database...")
             new_plant.addNewPlant() 
             print("Manager: Berhasil simpan ke DB.")
 
-            # 6. Update List Lokal
             self.plantList.append(new_plant)
             
             return True
@@ -99,7 +89,6 @@ class PlantManager:
         Menghapus tanaman dari Database (via Model) dan List Memory.
         Dipanggil oleh HomePage setelah konfirmasi user.
         """
-        # 1. Cari objek tanaman di dalam list memory
         plant_to_delete = None
         for plant in self.plantList:
             if plant.plantID == plantID:
@@ -108,11 +97,8 @@ class PlantManager:
         
         if plant_to_delete:
             try:
-                # 2. Panggil metode removePlant() milik MODEL (Plant.py)
-                # Ini akan menjalankan query DELETE di database sesuai kode yang kamu punya
                 plant_to_delete.removePlant() 
 
-                # 3. Hapus dari Memory List Manager agar sinkron
                 self.plantList.remove(plant_to_delete)
                 
                 print(f"✅ PlantManager: Tanaman {plantID} berhasil dihapus dari list & DB.")
