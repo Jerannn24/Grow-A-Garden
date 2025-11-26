@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
 from models.Task import Task
+from models.Plant import Plant
+from views.ActivityRecordPopUp import ActivityRecordPopUp
 import datetime
 
 class DisplayToDoList(QWidget):
@@ -72,12 +74,15 @@ class DisplayToDoList(QWidget):
             if item and item.widget():
                 item.widget().deleteLater()
         
-        # Fetch tasks
+        # Fetch incomplete tasks
         overdue_tasks = Task.getOverdueTasks(user_id)
         today_tasks = Task.getTodaysTodo(user_id)
         week_tasks = Task.getWeeksTodo(user_id)
         
-        print(f"[DEBUG-UI] Tasks fetched - overdue: {len(overdue_tasks)}, today: {len(today_tasks)}, week: {len(week_tasks)}")
+        # Fetch completed tasks
+        completed_tasks = Task.getCompletedTasks(user_id)
+        
+        print(f"[DEBUG-UI] Tasks fetched - overdue: {len(overdue_tasks)}, today: {len(today_tasks)}, week: {len(week_tasks)}, completed: {len(completed_tasks)}")
         
         # Create section cards
         if overdue_tasks:
@@ -89,9 +94,16 @@ class DisplayToDoList(QWidget):
         if week_tasks:
             self.create_task_section("This Week", week_tasks, is_urgent=False)
         
-        # If no tasks at all
+        # Show completed tasks at the bottom
+        if completed_tasks:
+            self.create_task_section("Completed", completed_tasks, is_urgent=False, completed=True)
+        
+        # If no incomplete tasks at all
         if not overdue_tasks and not today_tasks and not week_tasks:
-            empty_label = QLabel("No tasks for you right now. Well done! 🎉")
+            if not completed_tasks:
+                empty_label = QLabel("No tasks for you right now. Well done! 🎉")
+            else:
+                empty_label = QLabel("All tasks completed! 🎉")
             empty_label.setStyleSheet("color: #999; font-size: 14px; text-align: center;")
             empty_label.setAlignment(Qt.AlignCenter)
             self.content_layout.insertWidget(0, empty_label)
@@ -99,7 +111,7 @@ class DisplayToDoList(QWidget):
         # Add stretch at the end
         self.content_layout.addStretch()
 
-    def create_task_section(self, section_title: str, tasks_dict: dict, is_urgent: bool = False):
+    def create_task_section(self, section_title: str, tasks_dict: dict, is_urgent: bool = False, completed: bool = False):
         """Create a card section containing task items grouped by plant"""
         card = QFrame()
         card.setObjectName("CardFrame")
@@ -112,6 +124,8 @@ class DisplayToDoList(QWidget):
         title.setObjectName("SectionTitle")
         if is_urgent:
             title.setStyleSheet("font-size: 20px; font-weight: bold; color: #D32F2F;")
+        elif completed:
+            title.setStyleSheet("font-size: 20px; font-weight: bold; color: #2E7D32;")
         layout.addWidget(title)
         
         # Icon map for action types
@@ -132,6 +146,8 @@ class DisplayToDoList(QWidget):
         
         # Group tasks by plant and add them
         for plant_id, task_list in sorted(tasks_dict.items()):
+            # Get plant name
+            plant_name = Plant.getPlantNameByID(plant_id)
             for task in sorted(task_list, key=lambda t: t.deadline):
                 icon = icon_map.get(task.actionType, "📋")
                 title_text = task.actionType.capitalize()
@@ -143,15 +159,16 @@ class DisplayToDoList(QWidget):
                 self.create_task_item(
                     layout,
                     icon,
-                    f"{title_text} - {plant_id}",
+                    f"{title_text} - {plant_name}",
                     desc,
                     task_is_urgent,
-                    task.deadline
+                    task.deadline,
+                    task if not completed else None  # Don't pass task for completed tasks (no Input button)
                 )
         
         self.content_layout.insertWidget(self.content_layout.count() - 1, card)
 
-    def create_task_item(self, parent_layout, icon, title, desc, is_urgent, deadline):
+    def create_task_item(self, parent_layout, icon, title, desc, is_urgent, deadline, task=None):
         """Create an individual task item card"""
         item_frame = QFrame()
         bg = "#FFF3E0" if is_urgent else "white"
@@ -193,13 +210,43 @@ class DisplayToDoList(QWidget):
         text_layout.addWidget(lbl_desc)
         text_layout.addWidget(lbl_deadline)
         
-        # Input button
-        btn = QPushButton("Input")
-        btn.setCursor(QCursor(Qt.PointingHandCursor))
-        btn.setFixedSize(80, 38)
-        btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+        # Input button (only for incomplete tasks)
+        if task:
+            btn = QPushButton("Input")
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setFixedSize(80, 38)
+            btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+            
+            # Connect button to show popup
+            btn.clicked.connect(lambda: self.show_activity_popup(task))
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(btn)
+        else:
+            # For completed tasks, show checkmark and actual quantity
+            chk_label = QLabel("✓")
+            chk_label.setStyleSheet("color: #2E7D32; font-size: 24px; font-weight: bold;")
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(chk_label)
         
-        row.addWidget(lbl_icon)
-        row.addLayout(text_layout, 1)
-        row.addWidget(btn)
         parent_layout.addWidget(item_frame)
+    
+    def show_activity_popup(self, task):
+        """Show the activity record popup and mark task as done when confirmed"""
+        popup = ActivityRecordPopUp(task=task, parent=self)
+        popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
+        popup.exec_()
+    
+    def on_task_confirmed(self, task, quantity):
+        """Mark the task as done when user confirms activity"""
+        try:
+            # Update task as completed with actual quantity
+            Task.completeTask(task.taskID, quantity)
+            print(f"✅ Task {task.taskID} marked as done with quantity {quantity}")
+            # Refresh the task display
+            self.populate_tasks(self.user_id)
+        except Exception as e:
+            print(f"❌ Error marking task as done: {e}")

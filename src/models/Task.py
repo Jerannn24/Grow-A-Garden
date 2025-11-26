@@ -218,6 +218,53 @@ class Task:
 
         return dict(grouped)
     
+    @staticmethod
+    def getCompletedTasks(user_id, plant_id=None):
+        """Get all completed tasks for a user, optionally filtered by plant_id"""
+        conn = Task.getConnectionApp()
+        cursor = conn.cursor()
+        
+        if plant_id:
+            cursor.execute("""
+                SELECT * FROM tasks
+                WHERE user_id = ? AND plant_id = ? AND status = 1
+                ORDER BY datetime(time_done) DESC
+                LIMIT 50
+            """, (user_id, plant_id))
+        else:
+            cursor.execute("""
+                SELECT * FROM tasks
+                WHERE user_id = ? AND status = 1
+                ORDER BY datetime(time_done) DESC
+                LIMIT 50
+            """, (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        tasks_by_plant = {}
+        for row in rows:
+            try:
+                deadline_dt = datetime.strptime(row['deadline'], "%Y-%m-%d %H:%M:%S")
+            except:
+                deadline_dt = datetime.strptime(row['deadline'], "%Y-%m-%d")
+            
+            task = Task(
+                taskID=row['task_id'],
+                plantID=row['plant_id'],
+                actionType=row['action_type'],
+                quantity=row['quantity'],
+                status=bool(row['status']),
+                deadline=deadline_dt
+            )
+            
+            plant_id_key = row['plant_id']
+            if plant_id_key not in tasks_by_plant:
+                tasks_by_plant[plant_id_key] = []
+            tasks_by_plant[plant_id_key].append(task)
+        
+        print(f"[DEBUG] getCompletedTasks rows count: {len(rows)}, grouped keys: {list(tasks_by_plant.keys())}")
+        return tasks_by_plant
+    
     # return rasio actual_quantity / quantity 
     @staticmethod
     def getCarePercentage(plant_id, action_type):
@@ -350,7 +397,9 @@ class Task:
                     if obj.dailyLightingReq <= 0:
                         print(f"[DEBUG-REGEN]   Action 'light' skipped (requirement={obj.dailyLightingReq})")
                         continue
+                    # Light tasks should ALWAYS be every 24 hours, not based on dailyLightingReq
                     interval = timedelta(hours=24)
+                    print(f"[DEBUG-REGEN]   Light interval set to 24 hours (dailyLightingReq={obj.dailyLightingReq})")
 
                 elif action == "harvest":
                     # For harvest, calculate based on harvest estimate date
@@ -399,6 +448,16 @@ class Task:
                     AND date(deadline) > date('now', '+7 hours')
                     AND date(deadline) <= date('now', '+7 hours', '+7 days')
                 """, (user_id, pid, action))
+                
+                # For light tasks, also delete future incomplete tasks to ensure 24-hour interval
+                if action == "light":
+                    cursor.execute("""
+                        DELETE FROM tasks
+                        WHERE user_id = ? AND plant_id = ? AND action_type = ?
+                        AND status = 0
+                        AND datetime(deadline) > datetime('now')
+                    """, (user_id, pid, action))
+                    print(f"[DEBUG-REGEN]   Cleaned up old light tasks for plant_id={pid}")
 
                 # Generate ulang task sampai 7 hari ke depan
                 next_time = last_time + interval
@@ -423,3 +482,21 @@ class Task:
         conn.commit()
         print(f"[DEBUG-REGEN] Tasks committed to database")
         conn.close()
+
+    @staticmethod
+    def completeTask(task_id, actual_quantity):
+        """Mark a task as completed and record actual quantity"""
+        conn = Task.getConnectionApp()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE tasks
+            SET status = 1,
+                actual_quantity = ?,
+                time_done = datetime('now')
+            WHERE task_id = ?
+        """, (actual_quantity, task_id))
+        
+        conn.commit()
+        conn.close()
+        print(f"[DEBUG] Task {task_id} marked as complete with quantity {actual_quantity}")

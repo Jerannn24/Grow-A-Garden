@@ -261,6 +261,26 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
         print("Tanaman tidak ditemukan!")
         return None
 
+    @staticmethod
+    def getPlantNameByID(plant_id):
+        """Get plant name from database by plantID"""
+        conn = Plant._get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT plantName FROM plants WHERE plantID = ?", (plant_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                plant_name = row['plantName']
+                print(f"[DEBUG] getPlantNameByID: plant_id={plant_id} -> name={plant_name}")
+                return plant_name
+            print(f"[DEBUG] getPlantNameByID: plant_id={plant_id} not found, returning ID")
+            return plant_id  # Return plantID if not found
+        except Exception as e:
+            print(f"[DEBUG] getPlantNameByID error: {e}")
+            conn.close()
+            return plant_id
+
     # SETTER
     def setUserID(self, userID):
         self.userID = userID

@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
 from models.Plant import Plant
 from models.Task import Task
+from views.ActivityRecordPopUp import ActivityRecordPopUp
 import datetime
 
 class PlantDetails(QWidget):
@@ -169,6 +170,7 @@ class PlantDetails(QWidget):
         overdue_tasks = Task.getOverdueTasks(user_id=self.user_id, plant_id=self.plant_id)
         today_tasks = Task.getTodaysTodo(user_id=self.user_id, plant_id=self.plant_id)
         week_tasks = Task.getWeeksTodo(user_id=self.user_id, plant_id=self.plant_id)
+        completed_tasks = Task.getCompletedTasks(user_id=self.user_id, plant_id=self.plant_id)
         
         # Icon and description maps
         icon_map = {
@@ -199,27 +201,43 @@ class PlantDetails(QWidget):
         # Display tasks by category
         has_tasks = False
         
-        # Overdue tasks
-        if overdue_tasks:
-            has_tasks = True
-            for task_list in overdue_tasks.values():
-                for task in task_list:
-                    icon = icon_map.get(task.actionType, "📋")
-                    title_text = task.actionType.capitalize()
-                    desc = desc_map.get(task.actionType, "Task")
-                    self.create_task_item(
-                        layout,
-                        icon,
-                        title_text,
-                        desc,
-                        True,  # is_urgent
-                        task.deadline
-                    )
+        # Helper function to display tasks with section header
+        def add_task_section(section_title, tasks_dict, is_urgent=False):
+            nonlocal has_tasks
+            if tasks_dict:
+                has_tasks = True
+                # Add section header
+                section_label = QLabel(section_title)
+                section_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {'#D32F2F' if is_urgent else '#2E7D32'}; margin-top: 10px;")
+                layout.addWidget(section_label)
+                
+                # Add tasks under this section
+                for task_list in tasks_dict.values():
+                    for task in task_list:
+                        icon = icon_map.get(task.actionType, "📋")
+                        title_text = task.actionType.capitalize()
+                        desc = desc_map.get(task.actionType, "Task")
+                        self.create_task_item(
+                            layout,
+                            icon,
+                            title_text,
+                            desc,
+                            is_urgent,
+                            task.deadline,
+                            task
+                        )
         
-        # Today tasks
-        if today_tasks:
-            has_tasks = True
-            for task_list in today_tasks.values():
+        # Add sections in order
+        add_task_section("⚠️ Overdue", overdue_tasks, is_urgent=True)
+        add_task_section("📅 Today", today_tasks, is_urgent=False)
+        add_task_section("📆 This Week", week_tasks, is_urgent=False)
+        
+        # Completed tasks section
+        if completed_tasks:
+            section_label = QLabel("✓ Completed")
+            section_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2E7D32; margin-top: 10px;")
+            layout.addWidget(section_label)
+            for task_list in completed_tasks.values():
                 for task in task_list:
                     icon = icon_map.get(task.actionType, "📋")
                     title_text = task.actionType.capitalize()
@@ -230,28 +248,12 @@ class PlantDetails(QWidget):
                         title_text,
                         desc,
                         False,
-                        task.deadline
-                    )
-        
-        # This week tasks
-        if week_tasks:
-            has_tasks = True
-            for task_list in week_tasks.values():
-                for task in task_list:
-                    icon = icon_map.get(task.actionType, "📋")
-                    title_text = task.actionType.capitalize()
-                    desc = desc_map.get(task.actionType, "Task")
-                    self.create_task_item(
-                        layout,
-                        icon,
-                        title_text,
-                        desc,
-                        False,
-                        task.deadline
+                        task.deadline,
+                        None  # No task object for completed tasks
                     )
         
         # No tasks message
-        if not has_tasks:
+        if not has_tasks and not completed_tasks:
             empty_label = QLabel("No tasks for this plant. Great work! 🎉")
             empty_label.setStyleSheet("color: #999; font-size: 14px; text-align: center;")
             empty_label.setAlignment(Qt.AlignCenter)
@@ -259,7 +261,7 @@ class PlantDetails(QWidget):
         
         self.content_layout.addWidget(self.todo_card)
 
-    def create_task_item(self, parent, icon, title, desc, is_urgent, deadline=None):
+    def create_task_item(self, parent, icon, title, desc, is_urgent, deadline=None, task=None):
         item_frame = QFrame()
         bg = "#FFF3E0" if is_urgent else "white"
         border = "#FFCC80" if is_urgent else "#EEEEEE"
@@ -302,15 +304,46 @@ class PlantDetails(QWidget):
         text_layout.addWidget(lbl_t)
         text_layout.addWidget(lbl_d)
         
-        btn = QPushButton("Input")
-        btn.setCursor(QCursor(Qt.PointingHandCursor))
-        btn.setFixedSize(80, 38)
-        btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+        # Input button (only for incomplete tasks)
+        if task:
+            btn = QPushButton("Input")
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setFixedSize(80, 38)
+            btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+            
+            # Connect button to show popup
+            btn.clicked.connect(lambda: self.show_activity_popup(task))
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(btn)
+        else:
+            # For completed tasks, show checkmark
+            chk_label = QLabel("✓")
+            chk_label.setStyleSheet("color: #2E7D32; font-size: 24px; font-weight: bold;")
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(chk_label)
         
-        row.addWidget(lbl_icon)
-        row.addLayout(text_layout, 1)
-        row.addWidget(btn)
         parent.addWidget(item_frame)
+    
+    def show_activity_popup(self, task):
+        """Show the activity record popup and mark task as done when confirmed"""
+        popup = ActivityRecordPopUp(task=task, parent=self)
+        popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
+        popup.exec_()
+    
+    def on_task_confirmed(self, task, quantity):
+        """Mark the task as done when user confirms activity"""
+        try:
+            # Update task as completed with actual quantity
+            Task.completeTask(task.taskID, quantity)
+            print(f"✅ Task {task.taskID} marked as done with quantity {quantity}")
+            # Refresh the task display
+            self.setup_todo_card()
+        except Exception as e:
+            print(f"❌ Error marking task as done: {e}")
 
     def populate_data(self, plant_obj: Plant, user_id: int):
         self.user_id = user_id
