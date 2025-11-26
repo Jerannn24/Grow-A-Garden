@@ -48,7 +48,7 @@ class LoginForm(QWidget):
         frameLayout.setContentsMargins(65, 55, 65, 50)
         
         iconSize = 160
-        svgFilePath = "public/icon.svg" 
+        svgFilePath = "src/public/icon.svg" 
         
         iconToAdd = None 
         svgWidget = QSvgWidget() 
@@ -84,7 +84,7 @@ class LoginForm(QWidget):
         frameLayout.addWidget(appDesc)
         
         frameLayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Fixed))
-
+        
         def createFeatureItem(iconText, title, description,r,g,b,opacity):
             featureWidget = QWidget()
             featureLayout = QHBoxLayout(featureWidget)
