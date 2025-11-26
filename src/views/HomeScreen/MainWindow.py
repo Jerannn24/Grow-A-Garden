@@ -10,6 +10,13 @@ from .AppHeader import AppHeader
 from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
 
+try:
+    from views.AdminReportDisplay import AdminReportDisplay
+    from models.Report import Report
+except ImportError:
+    AdminReportDisplay = None
+    Report = None
+
 
 from models.UserModel import UserModel
 from typing import Optional
@@ -78,16 +85,24 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         right_layout.addWidget(self.pages)
         
+        self.conn = None
+        self._setup_db()
+        
         main_layout.addWidget(right_widget)
  
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
-        self.settings_page = QWidget() 
+        self.settings_page = QWidget()
         self.detail_page = PlantDetails()
 
         self.profile_page = DisplayProfile(self.current_user, self)
-        
+                
+        self.reports_page = None
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder) 
+
         self.setStyleSheet(STYLE_SHEET)
  
         self.pages.addWidget(self.home_page)      
@@ -105,6 +120,9 @@ class MainWindow(QMainWindow):
             self.nav_buttons["todo"]: 2,
             self.nav_buttons["settings"]: 3,
         }
+        if "reports" in self.nav_buttons:
+            # Report index 4
+            self.nav_mapping[self.nav_buttons["reports"]] = 4
         
         for btn, index in self.nav_mapping.items():
             btn.clicked.connect(lambda checked, i=index, b=btn: self._switch_page_and_update_sidebar(i, b))
@@ -132,6 +150,17 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons.values():
             btn.setChecked(False)
  
+    def _setup_db(self):
+        """Setup database connection."""
+        try:
+            self.conn = sqlite3.connect(DB_FILE_PATH)
+            self.conn.row_factory = sqlite3.Row
+            if Report:
+                Report.create_table(self.conn)
+        except Exception as e:
+            print(f"❌ Error setting up database: {e}")
+            self.conn = None
+    
     def set_current_user(self, user_model):
         self.current_user = user_model
         
@@ -149,6 +178,27 @@ class MainWindow(QMainWindow):
         
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
+        
+        is_admin = user_model.role == "admin"
+        self.sidebar.set_admin_mode(is_admin)
+        
+        if is_admin:
+            if self.reports_page is None and AdminReportDisplay and self.conn:
+                self.reports_page = AdminReportDisplay(DB_FILE_PATH, self.conn, user_model, self)
+                try:
+
+                    placeholder = self._reports_placeholder
+                    self.pages.removeWidget(placeholder)
+                except Exception:
+                    pass
+                self.pages.insertWidget(4, self.reports_page)
+
+                if "reports" in self.nav_buttons:
+                    self.nav_mapping[self.nav_buttons["reports"]] = 4
+                    self.nav_buttons["reports"].clicked.connect(
+                        lambda checked, i=4, b=self.nav_buttons["reports"]: 
+                        self._switch_page_and_update_sidebar(i, b)
+                    )
         
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)
