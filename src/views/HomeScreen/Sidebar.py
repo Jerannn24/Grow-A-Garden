@@ -9,6 +9,7 @@ class Sidebar(QFrame):
         self.setFixedWidth(250)
         self._buttons = {}
         self.current_user = current_user
+        self.is_admin = False
         
         layout = QVBoxLayout()
         layout.setContentsMargins(15, 20, 15, 20)
@@ -26,6 +27,10 @@ class Sidebar(QFrame):
         layout.addWidget(self.btn_home)
         layout.addWidget(self.btn_comm)
         layout.addWidget(self.btn_todo)
+        
+        self.btn_reports = self.create_nav_btn("📋 Reports", "reports")
+        self.btn_reports.hide()
+        layout.addWidget(self.btn_reports)
         
         layout.addStretch()
         
@@ -68,6 +73,14 @@ class Sidebar(QFrame):
         # layout.addWidget(user_lbl)
         
         self.setLayout(layout)
+    
+    def set_admin_mode(self, is_admin: bool):
+        """Menampilkan/menyembunyikan tombol admin report berdasarkan role."""
+        self.is_admin = is_admin
+        if is_admin:
+            self.btn_reports.show()
+        else:
+            self.btn_reports.hide()
 
     def create_nav_btn(self, text, name):
         btn = QPushButton(text)
