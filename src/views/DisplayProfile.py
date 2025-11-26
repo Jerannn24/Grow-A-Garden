@@ -1,13 +1,15 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QGridLayout, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame, QGridLayout, QSizePolicy, QMessageBox, QDialog
 from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QLocale
+from PyQt5.QtCore import Qt, QLocale, pyqtSignal
 from models.UserModel import UserModel
 from typing import Optional
 from datetime import datetime
 from models.Plant import Plant
 from models.Post import Post
+from views.FormChangeProfile import FormChangeProfile
 
 class DisplayProfile(QWidget):
+    profileUpdateRequested = pyqtSignal(str, str, str, str)
     def __init__(self, current_user: Optional[UserModel], main_window, parent=None):
         super().__init__(parent)
         self.current_user = current_user
@@ -18,7 +20,6 @@ class DisplayProfile(QWidget):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setAlignment(Qt.AlignTop)
 
-        # Variabel referensi untuk QLabel angka yang akan diupdate
         self.plants_value_lbl = None
         self.posts_value_lbl = None
 
@@ -255,7 +256,17 @@ class DisplayProfile(QWidget):
         self.load_data()
 
     def displayEditProfile(self):
-        if hasattr(self.main_window, 'displayEditProfile'):
-            self.main_window.displayEditProfile()
-        else:
-            pass
+        if self.current_user is None:
+            QMessageBox.warning(self, "Akses Ditolak", "Anda harus login untuk mengedit profil.")
+            return
+        
+        edit_dialog = FormChangeProfile(self.current_user, self)
+        edit_dialog.profileUpdateRequested.connect(self.profileUpdateRequested.emit)
+        
+        if hasattr(self.main_window, 'profileUpdateResponse'):
+            self.main_window.profileUpdateResponse.connect(edit_dialog.display_message)
+            
+        result = edit_dialog.exec_()
+        
+        if result == QDialog.Accepted:
+            self.load_data()

@@ -50,7 +50,7 @@ STYLE_SHEET = """
 
 class MainWindow(QMainWindow):
     logoutRequested = pyqtSignal()
-    
+    profileUpdateRequested = pyqtSignal(str, str, str, str)
     def __init__(self):
         super().__init__()
         self.current_user: Optional[UserModel] = None
@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.pages)
         
         main_layout.addWidget(right_widget)
-        # inisiasi halaman home
+ 
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
@@ -89,12 +89,12 @@ class MainWindow(QMainWindow):
         self.profile_page = DisplayProfile(self.current_user, self)
         
         self.setStyleSheet(STYLE_SHEET)
-        # Tambahkan ke Stacked Widget
-        self.pages.addWidget(self.home_page)      # index 0 (Home)
-        self.pages.addWidget(self.community_page) # index 1 (Community)
-        self.pages.addWidget(self.todo_page)      # index 2 (Todo)
-        self.pages.addWidget(self.settings_page)  # index 3 (Settings)
-        self.pages.addWidget(self.detail_page)    # index 4 (Plant Details)
+ 
+        self.pages.addWidget(self.home_page)      
+        self.pages.addWidget(self.community_page) 
+        self.pages.addWidget(self.todo_page)      
+        self.pages.addWidget(self.settings_page) 
+        self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
         
         self.nav_buttons = self.sidebar.get_nav_buttons()
@@ -137,7 +137,9 @@ class MainWindow(QMainWindow):
         
         if hasattr(self.sidebar, 'update_profile_button'):
             self.sidebar.update_profile_button(user_model)
-
+            
+        self.profile_page.update_user_data(user_model)
+        
         user_lbl = self.sidebar.findChild(QLabel, 'user_info_label')
         if user_lbl:
             user_lbl.setText(f"👤 {user_model.username}\nID: {user_model.userID}")

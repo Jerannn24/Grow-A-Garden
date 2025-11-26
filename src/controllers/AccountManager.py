@@ -1,7 +1,7 @@
 import sys
 import os
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from typing import Optional
 
 from models.UserModel import UserModel 
@@ -11,6 +11,7 @@ from views.FormChangePassword import ChangePasswordForm
 from views.HomeScreen import MainWindow
 
 class AccountManager(QWidget):
+    profileUpdateResponse = pyqtSignal(str, bool)
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Grow a Garden Application - Account Manager")
@@ -58,6 +59,7 @@ class AccountManager(QWidget):
         self.registerView.switchToLoginRequested.connect(lambda: self.switchView('login'))
         self.registerView.registerRequested.connect(self.handleRegisterRequest)
         
+        self.homeScreenView.profile_page.profileUpdateRequested.connect(self.handleProfileUpdateRequest)
         self.homeScreenView.logoutRequested.connect(self.handleLogoutRequest) 
 
     
@@ -104,7 +106,33 @@ class AccountManager(QWidget):
             print(f"Failed to Change Password : {message}")
             self.registerView.errorDisplay.emit(message)
             
-         
+    def handleProfileUpdateRequest(self, username, email, location, profileInfo):
+        if self.currentUser is None:
+            self.profileUpdateResponse.emit("Error: User not logged in.", False)
+            return
+
+        user_id = self.currentUser.getUserID()
+        
+        success, message = UserModel.updateProfil(
+            self.model,
+            user_id,
+            username, 
+            email, 
+            location,
+            profileInfo)
+        
+        if success:
+            self.currentUser = UserModel.getByID(user_id) 
+            
+            if self.homeScreenView:
+                self.homeScreenView.set_current_user(self.currentUser)
+                
+            print(f"Success to Update Profile for: {username}.")
+            self.profileUpdateResponse.emit("Profil berhasil diperbarui!", True)
+        else:
+            print(f"Failed to Update Profile: {message}")
+            self.profileUpdateResponse.emit(message, False)
+            
     def handleLogoutRequest(self):
         self.currentUser = None
         print("Logout Success.")

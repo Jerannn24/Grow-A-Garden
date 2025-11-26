@@ -159,7 +159,7 @@ class UserModel:
 
         return True, "Password updated successfully" 
 
-    def updateProfil(self, userID: int, newUsername:str, newEmail: str, newProfileInfo: str, newLocation: str):
+    def updateProfil(self, userID: int, newUsername:str, newEmail: str, newLocation: str, newProfileInfo: str,):
         conn = self.get_conn()
 
         check_query = "SELECT * FROM users WHERE userID = ?"
