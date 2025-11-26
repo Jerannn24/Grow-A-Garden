@@ -197,11 +197,6 @@ class LoginForm(QWidget):
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         
-        # Error label (untuk menampilkan pesan login gagal / suspend / ban)
-        self.errorLabel = QLabel("")
-        self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
-        formLayout.addWidget(self.errorLabel)
-
         # Tombol Login
         loginButton = QPushButton("Sign In")
         loginButton.setFont(QFont('Geist', 14, QFont.Bold))
@@ -354,9 +349,6 @@ class LoginForm(QWidget):
         self.loginButton.clicked.connect(lambda: 
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
         )
-
-        # tampilkan pesan error/penolakan login
-        self.errorDisplay.connect(lambda msg: self.errorLabel.setText(msg))
         
     def clearForm(self):
         self.inputEmail.clear()
