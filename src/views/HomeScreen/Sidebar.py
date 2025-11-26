@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QPushButton
-from PyQt5.QtCore import Qt
+from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtCore import Qt, QByteArray, QSize
 from models.UserModel import UserModel
 from typing import Optional
 class Sidebar(QFrame):
@@ -15,8 +16,39 @@ class Sidebar(QFrame):
         layout.setContentsMargins(15, 20, 15, 20)
         layout.setSpacing(10)
         
+        icon_size = 64
+        svg_path = "src/public/icon.svg"
+        svg_widget = QSvgWidget()
+        icon_to_add = None
+        
+        try:
+            with open(svg_path, 'rb') as f:
+                svg_data = f.read()
+            svg_widget.load(QByteArray(svg_data))
+        except FileNotFoundError:
+            svg_widget = None
+
+        if svg_widget and svg_widget.renderer().isValid():
+            icon_to_add = svg_widget
+            icon_to_add.setFixedSize(icon_size, icon_size)
+        else:
+            fallback_label = QLabel("🌱") 
+            fallback_label.setStyleSheet("font-size: 40px; color: green;")
+            fallback_label.setAlignment(Qt.AlignCenter)
+            icon_to_add = fallback_label
+            
+        layout.addWidget(icon_to_add, alignment=Qt.AlignCenter)
+        layout.addSpacing(10)
+        
         title = QLabel("Grow a Garden")
         title.setObjectName("AppTitle")
+        title.setStyleSheet("""
+            QLabel#AppTitle {
+                color: white; 
+                font-size: 22px; 
+                font-weight: bold; 
+            }
+        """)
         layout.addWidget(title)
         layout.addSpacing(20)
 
