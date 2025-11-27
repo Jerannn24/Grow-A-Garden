@@ -156,6 +156,7 @@ class MainWindow(QMainWindow):
         
         self.settings_page.password_changed.connect(self.handle_password_change)
         self.settings_page.settings_changed.connect(self.handle_settings_change)
+        self.settings_page.logoutRequested.connect(self._emit_logout_request)
     
         
     def displayProfile(self):       
@@ -177,16 +178,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"❌ Error setting up database: {e}")
             self.conn = None
-    
-        
-        # Connect todo page back button
-        if isinstance(self.todo_page, ToDoListManager):
-            self.todo_page.backRequested.connect(self.go_back_to_home)
-        
-        # Connect settings page signals
-        self.settings_page.password_changed.connect(self.handle_password_change)
-        self.settings_page.settings_changed.connect(self.handle_settings_change)
-        self.settings_page.logoutRequested.connect(self._emit_logout_request)
     
     def set_current_user(self, user_model):
         self.current_user = user_model
