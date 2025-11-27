@@ -1,6 +1,7 @@
 import sqlite3
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QDialog
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QDialog, QSystemTrayIcon
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QIcon
 
 from models.UserModel import DB_FILE_PATH
 from models.Post import Post
@@ -22,6 +23,7 @@ except ImportError:
 from models.UserModel import UserModel
 from typing import Optional
 from views.DisplayProfile import DisplayProfile
+from views.DisplayNotification import DisplayNotification 
 STYLE_SHEET = """
     QMainWindow { background-color: #F8F9FA; }
     
@@ -96,6 +98,8 @@ class MainWindow(QMainWindow):
  
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
+        self.todo_page = ToDoListManager(self.current_user)
+        self.settings_page = DisplaySettings(user_model=None)
         
         self.reports_page = None
         self.detail_page = PlantDetails()
@@ -110,6 +114,8 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.settings_page) 
         self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
+        self.pages.setCurrentIndex(0)
+
         
         # Placeholder for reports page so navigation index stays stable
         self._reports_placeholder = QWidget()
@@ -133,6 +139,7 @@ class MainWindow(QMainWindow):
 
         self.init_connections()
         
+        
     def init_connections(self):
         if hasattr(self.sidebar, 'connect_profile_action'):
             self.sidebar.connect_profile_action(self.displayProfile) 
@@ -143,6 +150,12 @@ class MainWindow(QMainWindow):
 
         self.home_page.openDetailRequested.connect(self.show_plant_details)
         self.detail_page.backRequested.connect(self.go_back_to_home)
+        
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.backRequested.connect(self.go_back_to_home)
+        
+        self.settings_page.password_changed.connect(self.handle_password_change)
+        self.settings_page.settings_changed.connect(self.handle_settings_change)
     
         
     def displayProfile(self):       
@@ -178,7 +191,6 @@ class MainWindow(QMainWindow):
     def set_current_user(self, user_model):
         self.current_user = user_model
         
-        # Update settings page with current user
         self.settings_page.user_model = user_model
         
         if hasattr(self.sidebar, 'update_profile_button'):
@@ -196,7 +208,6 @@ class MainWindow(QMainWindow):
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
         
-        # Set user for todo list manager
         if isinstance(self.todo_page, ToDoListManager):
             self.todo_page.set_current_user(user_model)
 
@@ -237,7 +248,6 @@ class MainWindow(QMainWindow):
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
         
-        # Refresh todo list when switching to it
         if index == 2 and isinstance(self.todo_page, ToDoListManager):
              self.todo_page.refresh_tasks()
     
@@ -327,3 +337,40 @@ class MainWindow(QMainWindow):
             print(f"✅ Password updated for user: {self.current_user.getUsername()}")
         else:
             print(f"❌ Password update failed: {message}")
+        if self.current_user:
+            print(f"Password change requested for user: {self.current_user.getUsername()}")
+    
+    def _remove_on_top(self):
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
+        self.show()
+
+        self.raise_()
+        self.activateWindow()
+
+        print("DEBUG: ON-TOP removed, window forced to front")
+
+
+    def receiveNotif(self, title, message, notifID=None):
+        """
+        Menerima sinyal dari NotificationManager.
+        Memilih cara menampilkan notifikasi berdasarkan status window.
+        """
+        
+        if self.isVisible():
+            popup = DisplayNotification.show_notification(title, message, self)
+            
+        else:
+            top_window = self.window()
+            if hasattr(top_window, 'tray_icon'):
+                top_window.tray_icon.showMessage(
+                    title,
+                    message,
+                    QSystemTrayIcon.Warning,
+                    5000 
+                )
+        if notifID:
+            try:
+                from models.TaskNotification import TaskNotification
+                TaskNotification.mark_as_sended(notifID)
+            except Exception:
+                pass

@@ -5,6 +5,7 @@ from controllers.AccountManager import AccountManager
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     
     manager = AccountManager() 
     manager.show() 

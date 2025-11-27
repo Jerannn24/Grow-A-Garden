@@ -31,6 +31,9 @@ class HomePage(QWidget):
         self.scroll.setFrameShape(QFrame.NoFrame)
         
         self.content_widget = QWidget()
+        self.content_widget.setMinimumWidth(0)
+        from PyQt5.QtWidgets import QSizePolicy
+        self.content_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.flow_layout = FlowLayout(self.content_widget) 
         self.flow_layout.setSpacing(20)
         self.scroll.setWidget(self.content_widget)
