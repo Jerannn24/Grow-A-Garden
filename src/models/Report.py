@@ -7,20 +7,20 @@ from models.UserModel import DB_FILE_PATH
 class Report:
     VIOLATION_TYPES = [
         "Spam",
-        "Misinformasi",
-        "Konten Tidak Pantas",
-        "Ujaran Kebencian",
-        "Pelanggaran Hak Cipta",
-        "Lainnya"
+        "Misinformation",
+        "Inappropriate Content",
+        "Hate Speech",
+        "Copyright Infringement",
+        "Others"
     ]
     
     ADMIN_ACTIONS = [
-        "Laporan Tidak Valid",
-        "Berikan Peringatan",
-        "Suspend 1 Hari",
-        "Suspend 3 Hari",
-        "Suspend 7 Hari",
-        "Ban Permanen"
+        "Report Not Valid",
+        "Delete Post",
+        "Suspend 1 Day",
+        "Suspend 3 Days",
+        "Suspend 7 Days",
+        "Permanent Ban"
     ]
     
     def __init__(self,
@@ -47,12 +47,10 @@ class Report:
 
     @staticmethod
     def get_conn() -> sqlite3.Connection:
-        """Membuka koneksi database baru untuk operasi."""
         return sqlite3.connect(DB_FILE_PATH)
 
     @classmethod
     def create_table(cls, conn: sqlite3.Connection):
-        """Membuat tabel reports jika belum ada."""
         query = """
         CREATE TABLE IF NOT EXISTS reports (
             reportID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +72,6 @@ class Report:
         conn.commit()
 
     def create_report(self, conn: sqlite3.Connection):
-        """Menyimpan report baru ke database."""
         Report.create_table(conn)
         cur = conn.cursor()
         cur.execute("""
@@ -87,7 +84,6 @@ class Report:
 
     @classmethod
     def fromRowSQL(cls, row: Any) -> Optional["Report"]:
-        """Membuat instance Report dari baris SQL."""
         if row is None:
             return None
         
@@ -129,7 +125,6 @@ class Report:
 
     @classmethod
     def get_by_id(cls, conn: sqlite3.Connection, report_id: int) -> Optional["Report"]:
-        """Mendapatkan report berdasarkan ID."""
         if conn is None:
             return None
         cur = conn.execute("SELECT * FROM reports WHERE reportID = ?", (report_id,))
@@ -138,10 +133,6 @@ class Report:
 
     @classmethod
     def get_all_reports_for_admin(cls, conn: sqlite3.Connection) -> List["Report"]:
-        """Mendapatkan semua report untuk admin dengan sorting:
-        1. Prioritas: report terbanyak per post
-        2. Prioritas kedua: report paling lama ke paling baru
-        """
         if conn is None:
             return []
         
@@ -166,7 +157,6 @@ class Report:
 
     @classmethod
     def get_reports_by_post(cls, conn: sqlite3.Connection, post_id: int) -> List["Report"]:
-        """Mendapatkan semua report untuk post tertentu."""
         if conn is None:
             return []
         cur = conn.execute("SELECT * FROM reports WHERE postID = ?", (post_id,))
@@ -175,7 +165,6 @@ class Report:
 
     @classmethod
     def get_report_count_by_post(cls, conn: sqlite3.Connection, post_id: int) -> int:
-        """Menghitung jumlah report untuk post tertentu."""
         if conn is None:
             return 0
         cur = conn.execute("SELECT COUNT(*) FROM reports WHERE postID = ? AND status = 'pending'", (post_id,))
@@ -184,7 +173,6 @@ class Report:
 
     @classmethod
     def has_user_reported_post(cls, conn: sqlite3.Connection, post_id: int, user_id: int) -> bool:
-        """Cek apakah user sudah pernah report post ini."""
         if conn is None:
             return False
         cur = conn.execute("SELECT 1 FROM reports WHERE postID = ? AND reporterID = ? LIMIT 1", 
@@ -192,7 +180,6 @@ class Report:
         return cur.fetchone() is not None
 
     def update_admin_action(self, conn: sqlite3.Connection, admin_id: int, action: str):
-        """Update report dengan aksi admin."""
         if conn is None or self.reportID is None:
             return
         
@@ -200,7 +187,7 @@ class Report:
         self.adminID = admin_id
         self.actionTime = datetime.now().isoformat()
         
-        if action == "Laporan Tidak Valid":
+        if action == "Report Not Valid":
             self.status = "dismissed"
         else:
             self.status = "action_taken"
@@ -223,7 +210,6 @@ class Report:
 
     @staticmethod
     def get_username_by_id(conn: sqlite3.Connection, user_id: int) -> str:
-        """Mendapatkan username berdasarkan userID."""
         if conn is None:
             return f"User {user_id}"
         try:

@@ -19,7 +19,7 @@ class AdminActionForm(QWidget):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(20)
         
-        header_label = QLabel("⚡ Tindakan Admin")
+        header_label = QLabel("⚡ Take Action")
         header_label.setStyleSheet("""
             font-size: 20px; 
             font-weight: bold; 
@@ -39,21 +39,21 @@ class AdminActionForm(QWidget):
         info_layout = QVBoxLayout(info_frame)
         info_layout.setSpacing(8)
         
-        info_label = QLabel("Informasi Laporan:")
+        info_label = QLabel("Report Information:")
         info_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px;")
         info_layout.addWidget(info_label)
         
-        reporter_lbl = QLabel(f"Pelapor: {reporter_name}")
+        reporter_lbl = QLabel(f"Reporter: {reporter_name}")
         reporter_lbl.setStyleSheet("color: #666; font-size: 13px;")
         info_layout.addWidget(reporter_lbl)
         
-        violation_lbl = QLabel(f"Jenis Pelanggaran: {violation_type}")
+        violation_lbl = QLabel(f"Violation Type: {violation_type}")
         violation_lbl.setStyleSheet("color: #666; font-size: 13px;")
         info_layout.addWidget(violation_lbl)
         
         layout.addWidget(info_frame)
         
-        action_label = QLabel("Pilih Tindakan *")
+        action_label = QLabel("Select Action *")
         action_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px; margin-top: 10px;")
         layout.addWidget(action_label)
         
@@ -81,7 +81,7 @@ class AdminActionForm(QWidget):
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
         
-        self.cancel_btn = QPushButton("Batal")
+        self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #F5F5F5;
@@ -98,7 +98,7 @@ class AdminActionForm(QWidget):
         """)
         self.cancel_btn.clicked.connect(self.close)
         
-        self.submit_btn = QPushButton("Terapkan Tindakan")
+        self.submit_btn = QPushButton("Apply Action")
         self.submit_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007F00;
@@ -125,15 +125,15 @@ class AdminActionForm(QWidget):
         action = self.action_combo.currentText()
         
         if not action:
-            QMessageBox.warning(self, "Peringatan", "Pilih tindakan terlebih dahulu.")
+            QMessageBox.warning(self, "Warning", "Please select an action first.")
             return
 
-        confirm_msg = f"Apakah Anda yakin ingin {action.lower()}?"
-        reply = QMessageBox.question(self, "Konfirmasi", confirm_msg, 
+        confirm_msg = f"Are you sure you want to {action.lower()}?"
+        reply = QMessageBox.question(self, "Confirmation", confirm_msg, 
                                      QMessageBox.Yes | QMessageBox.No)
         
         if reply == QMessageBox.Yes:
             self.actionSubmitted.emit(self.report_id, action)
-            QMessageBox.information(self, "Berhasil", "Tindakan telah diterapkan.")
+            QMessageBox.information(self, "Success", "Action has been applied.")
             self.close()
 

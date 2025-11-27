@@ -157,13 +157,13 @@ class AdminReportDisplay(QWidget):
         
         self.report_list.clear()
         reports = Report.get_all_reports_for_admin(self.conn)
-        
+
         if not reports:
             no_report_item = QListWidgetItem("No report")
             no_report_item.setFlags(Qt.NoItemFlags)
             self.report_list.addItem(no_report_item)
             return
-        
+
         from collections import defaultdict
         reports_by_post = defaultdict(list)
         for report in reports:
@@ -400,6 +400,22 @@ class AdminReportDisplay(QWidget):
                     if action == "Permanent Ban":
                         ban_reason = f"{action} by {self.admin_user.username}: {report.violationType}"
                         cur.execute("UPDATE users SET status = 'banned', suspendedUntil = NULL, banReason = ? WHERE userID = ?", (ban_reason, user.userID))
+                        try:
+                            cur.execute("SELECT postID FROM postList WHERE userID = ?", (user.userID,))
+                            post_rows = cur.fetchall()
+                            post_ids = [r[0] for r in post_rows] if post_rows else []
+                            if post_ids:
+                                cur.executemany("DELETE FROM reports WHERE postID = ?", [(pid,) for pid in post_ids])
+                                cur.executemany("DELETE FROM postLikes WHERE postID = ?", [(pid,) for pid in post_ids])
+                                cur.executemany("DELETE FROM postList WHERE postID = ?", [(pid,) for pid in post_ids])
+                        except Exception:
+                            try:
+                                cur.execute("DELETE FROM reports WHERE postID IN (SELECT postID FROM postList WHERE userID = ?)", (user.userID,))
+                                cur.execute("DELETE FROM postLikes WHERE postID IN (SELECT postID FROM postList WHERE userID = ?)", (user.userID,))
+                                cur.execute("DELETE FROM postList WHERE userID = ?", (user.userID,))
+                            except Exception:
+                                pass
+
                         info_msg = f"User account permanently blocked.\nReason: {ban_reason}"
                     elif action.startswith("Suspend"):
                         days = 1
@@ -408,7 +424,24 @@ class AdminReportDisplay(QWidget):
                         elif "7 Days" in action:
                             days = 7
                         from datetime import datetime, timedelta
-                        until_dt = (datetime.now() + timedelta(days=days))
+                        try:
+                            cur.execute("SELECT suspendedUntil FROM users WHERE userID = ?", (user.userID,))
+                            row = cur.fetchone()
+                            existing_until = row[0] if row and row[0] else None
+                        except Exception:
+                            existing_until = None
+
+                        now = datetime.now()
+                        if existing_until:
+                            try:
+                                existing_dt = datetime.fromisoformat(existing_until)
+                            except Exception:
+                                existing_dt = now
+                            base_dt = existing_dt if existing_dt > now else now
+                        else:
+                            base_dt = now
+
+                        until_dt = base_dt + timedelta(days=days)
                         until = until_dt.isoformat()
                         try:
                             friendly = until_dt.strftime("%d %b %Y %H:%M")
@@ -425,21 +458,33 @@ class AdminReportDisplay(QWidget):
                             try:
                                 Post.set_unavailable_by_id(self.conn, report.postID)
                                 if info_msg:
-                                    info_msg = info_msg + "\Related post is no longer available."
+                                    info_msg = info_msg + "\nRelated post is no longer available."
                                 else:
                                     info_msg = "Related post is no longer available."
                             except Exception:
                                 Post.delete_by_id(self.conn, report.postID)
                                 if info_msg:
-                                    info_msg = info_msg + "\Related post deleted."
+                                    info_msg = info_msg + "\nRelated post deleted."
                                 else:
                                     info_msg = "Related post deleted."
                         except Exception as e:
                             print(f"⚠ Failed to process post {report.postID}: {e}")
                     if info_msg:
                         try:
-                            parent = getattr(self, '_current_action_dialog', self)
-                            QMessageBox.information(parent, "Take Action", info_msg)
+                            if hasattr(self, '_current_action_dialog') and self._current_action_dialog:
+                                try:
+                                    self._current_action_dialog.done(QDialog.Accepted)
+                                except Exception:
+                                    try:
+                                        self._current_action_dialog.close()
+                                    except Exception:
+                                        pass
+                                try:
+                                    del self._current_action_dialog
+                                except Exception:
+                                    pass
+
+                            QMessageBox.information(self, "Take Action", info_msg)
                         except Exception:
                             pass
             
