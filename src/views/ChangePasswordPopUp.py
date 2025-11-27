@@ -118,6 +118,8 @@ class ChangePasswordPopUp(QDialog):
         self.btn_confirm = QPushButton("Change Password")
         self.btn_confirm.setCursor(QCursor(Qt.PointingHandCursor))
         self.btn_confirm.setFixedHeight(40)
+        self.btn_confirm.setDefault(True)
+        self.btn_confirm.setAutoDefault(True)
         self.btn_confirm.setStyleSheet("""
             QPushButton {
                 background-color: #FF6F00;
@@ -139,6 +141,13 @@ class ChangePasswordPopUp(QDialog):
         main_layout.addStretch()
         main_layout.addLayout(button_layout)
     
+    def keyPressEvent(self, event):
+        """Trigger confirm action when Enter is pressed anywhere in the dialog."""
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            self.validate_and_change()
+            return
+        super().keyPressEvent(event)
+
     def validate_and_change(self):
         """Validate inputs and update password in database"""
         new_password = self.input_new_password.text()

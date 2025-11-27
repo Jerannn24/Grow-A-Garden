@@ -260,9 +260,38 @@ class MainWindow(QMainWindow):
     
     def handle_settings_change(self, settings: dict):
         """Handle when settings are changed"""
-        if self.current_user:
-            print(f"Settings changed: {settings}")
-            # TODO: Save settings to database
+        if not self.current_user:
+            print("⚠️ Cannot save settings because no user is logged in.")
+            return
+
+        if self.conn is None:
+            print("⚠️ Database connection not available; settings not saved.")
+            return
+
+        email_enabled = bool(settings.get('email_notifications'))
+        push_enabled = bool(settings.get('push_notifications'))
+
+        if email_enabled and push_enabled:
+            preference_value = 'all'
+        elif email_enabled:
+            preference_value = 'email'
+        elif push_enabled:
+            preference_value = 'push'
+        else:
+            preference_value = 'none'
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE users SET notificationPreferences = ? WHERE userID = ?",
+                (preference_value, self.current_user.getUserID())
+            )
+            self.conn.commit()
+            self.current_user.notificationPreferences = preference_value
+            print(f"✅ Settings updated for {self.current_user.getUsername()}: {preference_value}")
+        except sqlite3.Error as exc:
+            self.conn.rollback()
+            print(f"❌ Failed to save settings: {exc}")
     
     def handle_password_change(self, new_password: str, confirm_password: str):
         """Handle password change request"""
@@ -270,11 +299,27 @@ class MainWindow(QMainWindow):
             print("Passwords do not match!")
             return
         
-        if len(new_password) < 6:
-            print("Password must be at least 6 characters!")
+        if len(new_password) < 8:
+            print("Password must be at least 8 characters!")
             return
         
-        if self.current_user:
-            # For now, just print - backend implementation would go here
-            print(f"Password change requested for user: {self.current_user.getUsername()}")
-            # TODO: Implement actual password change with current password verification
+        if not self.current_user:
+            print("⚠️ Cannot change password because no user is logged in.")
+            return
+
+        try:
+            success, message = self.current_user.changePassword(
+                self.current_user.getUsername(),
+                self.current_user.getEmail(),
+                new_password,
+                confirm_password
+            )
+        except Exception as exc:
+            print(f"❌ Error while updating password: {exc}")
+            return
+
+        if success:
+            self.current_user.password = ""
+            print(f"✅ Password updated for user: {self.current_user.getUsername()}")
+        else:
+            print(f"❌ Password update failed: {message}")
