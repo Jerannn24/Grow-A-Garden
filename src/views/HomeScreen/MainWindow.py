@@ -221,6 +221,8 @@ class MainWindow(QMainWindow):
                     )
 
     def _emit_logout_request(self):
+        if self.home_page:
+            self.home_page.set_current_user_id(None)
         self.logoutRequested.emit()
         
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):

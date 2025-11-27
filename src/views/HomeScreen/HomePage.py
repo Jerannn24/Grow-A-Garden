@@ -2,6 +2,7 @@ import time
 from datetime import datetime
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QScrollArea, QFrame, QMessageBox, QDialog
 from PyQt5.QtCore import Qt, pyqtSignal
+from typing import Optional
 
 from controllers.PlantManager import PlantManager
 from views.AddPlantForm import AddPlantForm
@@ -38,19 +39,16 @@ class HomePage(QWidget):
         self.refresh_plant_list()
 
     def refresh_plant_list(self):
-        
-        if not self.current_user_id:
-            return
-        
         while self.flow_layout.count():
             item = self.flow_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
 
-        add_card = AddPlantCard()
-        add_card.clicked.connect(self.open_add_plant_form)
-        self.flow_layout.addWidget(add_card)
+        self._add_addplant_card()
+
+        if not self.current_user_id:
+            return
 
         # Ambil Data dari manager
         plants = self.plant_manager.plantList 
@@ -77,12 +75,21 @@ class HomePage(QWidget):
             card.deleteRequested.connect(self.handle_delete_plant)
             card.detailsRequested.connect(self.openDetailRequested.emit)
             self.flow_layout.addWidget(card)
+
+    def _add_addplant_card(self):
+        add_card = AddPlantCard()
+        add_card.clicked.connect(self.open_add_plant_form)
+        self.flow_layout.addWidget(add_card)
                 
-    def set_current_user_id(self, userID: int):
-        if self.current_user_id != userID:
-            self.current_user_id = userID
+    def set_current_user_id(self, userID: Optional[int]):
+        self.current_user_id = userID
+
+        if self.current_user_id:
             self.plant_manager.loadUserData(self.current_user_id)
-            self.refresh_plant_list()
+        else:
+            self.plant_manager.plantList = []
+
+        self.refresh_plant_list()
     
     def open_add_plant_form(self):
         if not self.current_user_id:
