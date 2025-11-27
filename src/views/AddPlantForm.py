@@ -71,9 +71,6 @@ class AddPlantForm(QDialog):
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 20px; /* Reduced width */
-                border-left-width: 1px; /* Added separator */
-                border-left-color: #ddd;
-                border-left-style: solid;
                 border-top-right-radius: 8px;
                 border-bottom-right-radius: 8px;
             }
