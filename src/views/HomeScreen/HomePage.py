@@ -7,6 +7,7 @@ from typing import Optional
 from controllers.PlantManager import PlantManager
 from views.AddPlantForm import AddPlantForm
 from views.RemovePlantForm import RemovePlantForm
+from models.Task import Task
 from .PlantCard import PlantCard
 from .AddPlantCard import AddPlantCard
 from .FlowLayout import FlowLayout
@@ -42,16 +43,18 @@ class HomePage(QWidget):
         self.refresh_plant_list()
 
     def refresh_plant_list(self):
+        if not self.current_user_id:
+            return
+        
         while self.flow_layout.count():
             item = self.flow_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
 
-        self._add_addplant_card()
-
-        if not self.current_user_id:
-            return
+        add_card = AddPlantCard()
+        add_card.clicked.connect(self.open_add_plant_form)
+        self.flow_layout.addWidget(add_card)
 
         # Ambil Data dari manager
         plants = self.plant_manager.plantList 
@@ -64,7 +67,8 @@ class HomePage(QWidget):
             p_phase = plant.getPlantPhase()
             p_harvest = plant.getHarvestEstim()
             p_sun = plant.getLightingDuration() 
-            p_water = plant.getWateringFrequency()
+            water = Task.getCarePercentage(plant.plantID, "water")
+            p_water = (f"{water * 100:.1f}%")
 
             stats = {"🌱": p_media, "🔄": p_phase, "📅": p_harvest, "☀️": p_sun, "💧": p_water}
             
@@ -78,11 +82,6 @@ class HomePage(QWidget):
             card.deleteRequested.connect(self.handle_delete_plant)
             card.detailsRequested.connect(self.openDetailRequested.emit)
             self.flow_layout.addWidget(card)
-
-    def _add_addplant_card(self):
-        add_card = AddPlantCard()
-        add_card.clicked.connect(self.open_add_plant_form)
-        self.flow_layout.addWidget(add_card)
                 
     def set_current_user_id(self, userID: Optional[int]):
         self.current_user_id = userID

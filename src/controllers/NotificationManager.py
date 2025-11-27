@@ -18,6 +18,10 @@ class NotificationManager(QObject):
         self.check_notifications()
 
     def check_notifications(self):
+        print("[DEBUG] Checking notifications...")
+
+        # TESTING
+        self.newNotification.emit(999, "Test Notification", "This is a test message.")
         pref = getattr(self.user_model, 'notificationPreferences', 'all')
         if pref != 'all':
             return

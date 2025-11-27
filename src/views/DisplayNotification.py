@@ -15,7 +15,6 @@ class DisplayNotification(QWidget):
             QWidget {
                 background-color: #FFFFFF;
                 border-radius: 10px;
-                border: 1px solid #E0E0E0;
             }
             QLabel { color: #333; }
         """)
