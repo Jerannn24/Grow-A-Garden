@@ -71,7 +71,7 @@ class FormChangeProfile(QDialog):
         self.saveButton.setObjectName("SaveButton")
         self.saveButton.clicked.connect(self._validate_and_emit) 
         self.saveButton.clicked.connect(self.reject)
-        
+        self.saveButton.setDefault(True)
         button_layout.addWidget(self.cancelButton)
         button_layout.addWidget(self.saveButton)
         

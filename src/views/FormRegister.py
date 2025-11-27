@@ -287,7 +287,7 @@ class RegisterForm(QWidget):
         
         signupButton = QPushButton("Sign Up")
         signupButton.setFont(QFont('Geist', 14, QFont.Bold))
-        
+        self.signupButton.setDefault(True)
         signupButton.setStyleSheet("""
             QPushButton {
                 background-color: #076804;
@@ -338,6 +338,35 @@ class RegisterForm(QWidget):
                 self.inputConfirm.text()    
             )
         )
+
+        # Allow pressing Enter (Return) in any input field to trigger registration
+        try:
+            self.inputName.returnPressed.connect(self.signupButton.click)
+            self.inputEmail.returnPressed.connect(self.signupButton.click)
+            self.inputLocation.returnPressed.connect(self.signupButton.click)
+            self.inputPass.returnPressed.connect(self.signupButton.click)
+            self.inputConfirm.returnPressed.connect(self.signupButton.click)
+        except Exception:
+            # fallback using keyPressEvent
+            pass
+
+    def keyPressEvent(self, event):
+        from PyQt5.QtCore import Qt as _Qt
+        if event.key() in (_Qt.Key_Return, _Qt.Key_Enter):
+            # Avoid duplicate submission: if focus is on a QLineEdit, returnPressed already
+            # triggers the signup button; only submit here when focus is not an input
+            focused = self.focusWidget()
+            from PyQt5.QtWidgets import QLineEdit as _QLineEdit
+            if not isinstance(focused, _QLineEdit):
+                self.registerRequested.emit(
+                    self.inputName.text(),      
+                    self.inputEmail.text(),     
+                    self.inputPass.text(),      
+                    self.inputLocation.text(),  
+                    self.inputConfirm.text()    
+                )
+        else:
+            super().keyPressEvent(event)
     
     def clearForm(self):
         self.inputName.clear()

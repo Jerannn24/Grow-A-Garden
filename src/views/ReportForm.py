@@ -132,6 +132,5 @@ class ReportForm(QWidget):
             QMessageBox.warning(self, "Peringatan", "Pilih jenis pelanggaran terlebih dahulu.")
             return
         
-        # Emit signal to parent to handle submission
         self.reportSubmitted.emit(self.post_id, violation_type, additional_details)
 

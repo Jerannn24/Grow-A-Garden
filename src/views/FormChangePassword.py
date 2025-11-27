@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect,
-    QMessageBox # <-- Diperlukan untuk Pop-up
+    QMessageBox
 )
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtGui import QFont, QColor
@@ -198,7 +198,7 @@ class ChangePasswordForm(QWidget):
         descLayout.addSpacerItem(QSpacerItem(40, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         frameLayout.addLayout(descLayout)
         return frame
-    # ------------------------------------------------
+    
     
     def _createRightPanel(self):
         centerWidget = QWidget()
@@ -233,9 +233,7 @@ class ChangePasswordForm(QWidget):
         subtitle.setStyleSheet("color: #666; margin-bottom: 25px;")
         formLayout.addWidget(subtitle)
         
-        # errorLabel tidak ditampilkan di layout (diganti pop-up)
-        # self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px; font-weight: bold;")
-        # formLayout.addWidget(self.errorLabel) 
+        
         
         def createFormField(labelText, placeholderText, isPassword=False, lineEditObject=None):
             label = QLabel(labelText)
@@ -278,7 +276,7 @@ class ChangePasswordForm(QWidget):
         
         self.changeButton.setText("Reset Password")
         self.changeButton.setFont(QFont('Geist', 14, QFont.Bold))
-        
+        self.changeButton.setDefault(True)
         self.changeButton.setStyleSheet("""
             QPushButton {
                 background-color: #076804;
@@ -306,20 +304,38 @@ class ChangePasswordForm(QWidget):
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         centerLayout.addWidget(frame)
+                
         return centerWidget
 
     def _setupConnections(self):
-        self.error_display.connect(self.displayError) 
-        
-        self.changeButton.clicked.connect(lambda: 
+        self.error_display.connect(self.displayError)
+
+        self.changeButton.clicked.connect(lambda:
             self.changePasswordRequested.emit(
-                self.inputUsername.text(),     
-                self.inputEmail.text(),      
-                self.inputNewPass.text(),      
-                self.inputConfirmPass.text()  
+                self.inputUsername.text(),
+                self.inputEmail.text(),
+                self.inputNewPass.text(),
+                self.inputConfirmPass.text()
             )
         )
         self.backLinkWidget.linkActivated.connect(lambda: self.switchToLoginRequested.emit())
+
+        self.inputUsername.returnPressed.connect(self.changeButton.click)
+        self.inputEmail.returnPressed.connect(self.changeButton.click)
+        self.inputNewPass.returnPressed.connect(self.changeButton.click)
+        self.inputConfirmPass.returnPressed.connect(self.changeButton.click)
+
+    def keyPressEvent(self, event):
+        from PyQt5.QtCore import Qt as _Qt
+        if event.key() in (_Qt.Key_Return, _Qt.Key_Enter):
+            focused = self.focusWidget()
+            from PyQt5.QtWidgets import QLineEdit as _QLineEdit
+            if not isinstance(focused, _QLineEdit):
+                self.changeButton.click()
+            else:
+                return
+        else:
+            super().keyPressEvent(event)
         
     def clearForm(self):
         self.inputUsername.clear()
@@ -346,6 +362,5 @@ if __name__ == '__main__':
         QTimer.singleShot(500, lambda: window.error_display.emit(message))
 
     window.changePasswordRequested.connect(handle_change_password)
-    # --------------------------------------------------------------
 
     sys.exit(app.exec_())
