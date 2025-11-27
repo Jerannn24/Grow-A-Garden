@@ -1,5 +1,5 @@
 import sqlite3
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QDialog
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from models.UserModel import DB_FILE_PATH
@@ -9,6 +9,8 @@ from .Sidebar import Sidebar
 from .AppHeader import AppHeader
 from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
+from controllers.ToDoListManager import ToDoListManager
+from views.DisplaySettings import DisplaySettings
 
 try:
     from views.AdminReportDisplay import AdminReportDisplay
@@ -16,7 +18,6 @@ try:
 except ImportError:
     AdminReportDisplay = None
     Report = None
-
 
 from models.UserModel import UserModel
 from typing import Optional
@@ -85,6 +86,9 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         right_layout.addWidget(self.pages)
         
+        self.todo_page = ToDoListManager(self.current_user)
+        self.settings_page = DisplaySettings(user_model=None) 
+
         self.conn = None
         self._setup_db()
         
@@ -92,8 +96,6 @@ class MainWindow(QMainWindow):
  
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
-        self.todo_page = QWidget() 
-        self.settings_page = QWidget()
         
         self.reports_page = None
         self.detail_page = PlantDetails()
@@ -163,8 +165,20 @@ class MainWindow(QMainWindow):
             print(f"❌ Error setting up database: {e}")
             self.conn = None
     
+        
+        # Connect todo page back button
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.backRequested.connect(self.go_back_to_home)
+        
+        # Connect settings page signals
+        self.settings_page.password_changed.connect(self.handle_password_change)
+        self.settings_page.settings_changed.connect(self.handle_settings_change)
+    
     def set_current_user(self, user_model):
         self.current_user = user_model
+        
+        # Update settings page with current user
+        self.settings_page.user_model = user_model
         
         if hasattr(self.sidebar, 'update_profile_button'):
             self.sidebar.update_profile_button(user_model)
@@ -181,6 +195,10 @@ class MainWindow(QMainWindow):
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
         
+        # Set user for todo list manager
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.set_current_user(user_model)
+
         is_admin = user_model.role == "admin"
         self.sidebar.set_admin_mode(is_admin)
         
@@ -213,19 +231,47 @@ class MainWindow(QMainWindow):
         
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
+        
+        # Refresh todo list when switching to it
+        if index == 2 and isinstance(self.todo_page, ToDoListManager):
+             self.todo_page.refresh_tasks()
     
     def show_plant_details(self, plant_id):
         print(f"Navigasi ke Detail Tanaman ID: {plant_id}")
         
         target_plant = next((p for p in self.home_page.plant_manager.plantList if p.plantID == plant_id), None)
         
-        if target_plant:
-            self.detail_page.populate_data(target_plant)
+        if target_plant and self.current_user:
+            self.detail_page.populate_data(target_plant, self.current_user.getUserID())
             self.pages.setCurrentIndex(4) 
             for btn in self.nav_buttons.values():
                 btn.setChecked(False)
         else:
-            print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            if not target_plant:
+                print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            else:
+                print("Error: User belum login")
 
     def go_back_to_home(self):
         self._switch_page_and_update_sidebar(0, self.nav_buttons["home"])
+    
+    def handle_settings_change(self, settings: dict):
+        """Handle when settings are changed"""
+        if self.current_user:
+            print(f"Settings changed: {settings}")
+            # TODO: Save settings to database
+    
+    def handle_password_change(self, new_password: str, confirm_password: str):
+        """Handle password change request"""
+        if new_password != confirm_password:
+            print("Passwords do not match!")
+            return
+        
+        if len(new_password) < 6:
+            print("Password must be at least 6 characters!")
+            return
+        
+        if self.current_user:
+            # For now, just print - backend implementation would go here
+            print(f"Password change requested for user: {self.current_user.getUsername()}")
+            # TODO: Implement actual password change with current password verification

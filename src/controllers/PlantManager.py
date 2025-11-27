@@ -10,6 +10,7 @@ if project_root_dir not in sys.path:
     sys.path.insert(0, project_root_dir)
 
 from models.Plant import Plant
+from models.Task import Task
 
 class PlantManager:
     
@@ -77,6 +78,14 @@ class PlantManager:
                 raise db_error 
 
             self.plantList.append(new_plant)
+            
+            # Generate tasks for the new plant
+            print("Manager: Generating tasks for new plant...")
+            try:
+                Task.regenerateTask(dataForm['userID'], plant_id=dataForm['plantID'])
+                print("Manager: Tasks generated successfully.")
+            except Exception as task_error:
+                print(f"Manager: Warning - Could not generate tasks: {task_error}")
             
             return True
             

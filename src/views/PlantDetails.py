@@ -4,12 +4,19 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
+from models.Plant import Plant
+from models.Task import Task
+from views.ActivityRecordPopUp import ActivityRecordPopUp
+import datetime
 
 class PlantDetails(QWidget):
     backRequested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
+        
+        self.user_id = None
+        self.plant_id = None
         
         self.setStyleSheet("""
             QWidget { background-color: #F8F9FA; }
@@ -52,8 +59,7 @@ class PlantDetails(QWidget):
 
         # Setup Kartu
         self.setup_info_card()
-        self.setup_todo_card()
-
+        self.todo_card = None  
         self.content_layout.addStretch()
         scroll.setWidget(self.content_widget)
         main_layout.addWidget(scroll)
@@ -152,22 +158,110 @@ class PlantDetails(QWidget):
         return lbl_val
 
     def setup_todo_card(self):
-        card = QFrame()
-        card.setObjectName("CardFrame")
-        layout = QVBoxLayout(card)
+        if not self.user_id or not self.plant_id:
+            return
+        
+        # Remove old todo card if it exists
+        if self.todo_card is not None:
+            self.content_layout.removeWidget(self.todo_card)
+            self.todo_card.deleteLater()
+        
+        # Fetch tasks for this specific plant
+        overdue_tasks = Task.getOverdueTasks(user_id=self.user_id, plant_id=self.plant_id)
+        today_tasks = Task.getTodaysTodo(user_id=self.user_id, plant_id=self.plant_id)
+        week_tasks = Task.getWeeksTodo(user_id=self.user_id, plant_id=self.plant_id)
+        completed_tasks = Task.getCompletedTasks(user_id=self.user_id, plant_id=self.plant_id)
+        
+        # Icon and description maps
+        icon_map = {
+            "water": "💧",
+            "fertilize": "🌱",
+            "light": "☀️",
+            "harvest": "🌾"
+        }
+        
+        desc_map = {
+            "water": "Water your plant",
+            "fertilize": "Apply fertilizer",
+            "light": "Provide sunlight",
+            "harvest": "Ready to harvest!"
+        }
+        
+        # Create main card
+        self.todo_card = QFrame()
+        self.todo_card.setObjectName("CardFrame")
+        layout = QVBoxLayout(self.todo_card)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
         
-        title = QLabel("Daily Tasks")
+        title = QLabel("Plant Tasks")
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
         
-        self.create_task_item(layout, "💧", "Water Plant (Overdue)", "Complete yesterday's watering task. Recommended: 100ml", True)
-        self.create_task_item(layout, "🌱", "Apply Fertilizer", "Recommended: 2 grams NPK", False)
+        # Display tasks by category
+        has_tasks = False
         
-        self.content_layout.addWidget(card)
+        # Helper function to display tasks with section header
+        def add_task_section(section_title, tasks_dict, is_urgent=False):
+            nonlocal has_tasks
+            if tasks_dict:
+                has_tasks = True
+                # Add section header
+                section_label = QLabel(section_title)
+                section_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {'#D32F2F' if is_urgent else '#2E7D32'}; margin-top: 10px;")
+                layout.addWidget(section_label)
+                
+                # Add tasks under this section
+                for task_list in tasks_dict.values():
+                    for task in task_list:
+                        icon = icon_map.get(task.actionType, "📋")
+                        title_text = task.actionType.capitalize()
+                        desc = desc_map.get(task.actionType, "Task")
+                        self.create_task_item(
+                            layout,
+                            icon,
+                            title_text,
+                            desc,
+                            is_urgent,
+                            task.deadline,
+                            task
+                        )
+        
+        # Add sections in order
+        add_task_section("⚠️ Overdue", overdue_tasks, is_urgent=True)
+        add_task_section("📅 Today", today_tasks, is_urgent=False)
+        add_task_section("📆 This Week", week_tasks, is_urgent=False)
+        
+        # Completed tasks section
+        if completed_tasks:
+            section_label = QLabel("✓ Completed")
+            section_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2E7D32; margin-top: 10px;")
+            layout.addWidget(section_label)
+            for task_list in completed_tasks.values():
+                for task in task_list:
+                    icon = icon_map.get(task.actionType, "📋")
+                    title_text = task.actionType.capitalize()
+                    desc = desc_map.get(task.actionType, "Task")
+                    self.create_task_item(
+                        layout,
+                        icon,
+                        title_text,
+                        desc,
+                        False,
+                        task.deadline,
+                        None  # No task object for completed tasks
+                    )
+        
+        # No tasks message
+        if not has_tasks and not completed_tasks:
+            empty_label = QLabel("No tasks for this plant. Great work! 🎉")
+            empty_label.setStyleSheet("color: #999; font-size: 14px; text-align: center;")
+            empty_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(empty_label)
+        
+        self.content_layout.addWidget(self.todo_card)
 
-    def create_task_item(self, parent, icon, title, desc, is_urgent):
+    def create_task_item(self, parent, icon, title, desc, is_urgent, deadline=None, task=None):
         item_frame = QFrame()
         bg = "#FFF3E0" if is_urgent else "white"
         border = "#FFCC80" if is_urgent else "#EEEEEE"
@@ -176,38 +270,94 @@ class PlantDetails(QWidget):
         row = QHBoxLayout(item_frame)
         row.setContentsMargins(20, 15, 20, 15)
         row.setSpacing(20)
-        # Pastikan item di dalam task list juga vertical center
-        row.setAlignment(Qt.AlignVCenter) 
+        row.setAlignment(Qt.AlignVCenter)
         
+        # Icon
         lbl_icon = QLabel(icon)
         lbl_icon.setFont(QFont("Arial", 24))
         
+        # Text layout (title, description, deadline)
         text_layout = QVBoxLayout()
         text_layout.setSpacing(4)
         
         t_color = "#D32F2F" if is_urgent else "#333"
         lbl_t = QLabel(title)
         lbl_t.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {t_color}; border: none; background: transparent;")
+        
         lbl_d = QLabel(desc)
-        lbl_d.setStyleSheet("color: #666; font-size: 13px; border: none; background: transparent;")
-        lbl_d.setWordWrap(True)
+        lbl_d.setStyleSheet("color: #666; font-size: 12px; border: none; background: transparent;")
+        
+        # Format deadline safely
+        deadline_text = ""
+        if deadline:
+            try:
+                if isinstance(deadline, datetime.datetime):
+                    deadline_text = deadline.strftime("%Y-%m-%d %H:%M")
+                else:
+                    deadline_text = str(deadline)
+            except:
+                deadline_text = "No deadline"
+            lbl_deadline = QLabel(f"Due: {deadline_text}")
+            lbl_deadline.setStyleSheet("color: #999; font-size: 11px; border: none; background: transparent; font-style: italic;")
+            text_layout.addWidget(lbl_deadline)
+        
         text_layout.addWidget(lbl_t)
         text_layout.addWidget(lbl_d)
         
-        btn = QPushButton("Input")
-        btn.setCursor(QCursor(Qt.PointingHandCursor))
-        btn.setFixedSize(80, 38)
-        btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+        # Input button (only for incomplete tasks)
+        if task:
+            btn = QPushButton("Input")
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setFixedSize(80, 38)
+            btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+            
+            # Connect button to show popup
+            btn.clicked.connect(lambda: self.show_activity_popup(task))
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(btn)
+        else:
+            # For completed tasks, show checkmark
+            chk_label = QLabel("✓")
+            chk_label.setStyleSheet("color: #2E7D32; font-size: 24px; font-weight: bold;")
+            
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(chk_label)
         
-        row.addWidget(lbl_icon)
-        row.addLayout(text_layout, 1)
-        row.addWidget(btn)
         parent.addWidget(item_frame)
+    
+    def show_activity_popup(self, task):
+        """Show the activity record popup and mark task as done when confirmed"""
+        popup = ActivityRecordPopUp(task=task, parent=self)
+        popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
+        popup.exec_()
+    
+    def on_task_confirmed(self, task, quantity):
+        """Mark the task as done when user confirms activity"""
+        try:
+            # Update task as completed with actual quantity
+            Task.completeTask(task.taskID, quantity)
+            print(f"✅ Task {task.taskID} marked as done with quantity {quantity}")
+            # Refresh the task display
+            self.setup_todo_card()
+        except Exception as e:
+            print(f"❌ Error marking task as done: {e}")
 
-    def populate_data(self, plant_obj):
+    def populate_data(self, plant_obj: Plant, user_id: int):
+        self.user_id = user_id
+        self.plant_id = plant_obj.getPlantID()
+        
+        water_percent = Task.getCarePercentage(plant_obj.plantID, "water")
+        light_percent = Task.getCarePercentage(plant_obj.plantID, "light")
         self.lbl_name.setText(plant_obj.getPlantName())
         self.lbl_species.setText(plant_obj.getPlantSpecies())
-        self.lbl_sun_val.setText(plant_obj.getLightingDuration())
+        self.lbl_water_val.setText(f"{water_percent * 100:.1f}%")
+        self.lbl_sun_val.setText(f"{light_percent * 100:.1f}%")
         
         icon = getattr(plant_obj, 'icon', '🌿') 
         self.icon_label.setText(icon)
+        
+        # Refresh todo card with actual user and plant data
+        self.setup_todo_card()

@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from typing import Optional
 
 from models.UserModel import UserModel 
+from models.Task import Task
 from views.FormLogin import LoginForm        
 from views.FormRegister import RegisterForm  
 from views.FormChangePassword import ChangePasswordForm
@@ -26,7 +27,10 @@ class AccountManager(QWidget):
         self.model = UserModel()
         self.currentUser: UserModel = None 
         conn = self.model.get_conn()
-        self.model.createTable(conn) 
+        self.model.createTable(conn)
+        
+        # Initialize Task table
+        Task.init_table()
         self._initViews()
         
         self.switchView('login')
