@@ -75,9 +75,9 @@ class DisplayPost(QWidget):
         header_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #333;")
 
         # Report button (kanan atas)
-        self.report_btn = QPushButton("⚠️ Laporkan")
+        self.report_btn = QPushButton("⚠️ Report")
         self.report_btn.setCursor(Qt.PointingHandCursor)
-        self.report_btn.setToolTip("Laporkan Post")
+        self.report_btn.setToolTip("Report Post")
         self.report_btn.setStyleSheet("""
             QPushButton { 
                 border: 1px solid #FF6B6B;
@@ -482,7 +482,7 @@ class DisplayPost(QWidget):
         
         if not user_model or not hasattr(user_model, 'userID') or not user_model.userID:
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Peringatan", "Anda harus login untuk melaporkan post.")
+            QMessageBox.warning(self, "Warning", "You need to login to report post.")
             return
         
         user_id = user_model.userID
@@ -490,17 +490,17 @@ class DisplayPost(QWidget):
         if self.conn and Report:
             if Report.has_user_reported_post(self.conn, self.post_id, user_id):
                 from PyQt5.QtWidgets import QMessageBox
-                QMessageBox.information(self, "Info", "Anda sudah melaporkan post ini sebelumnya.")
+                QMessageBox.information(self, "Info", "You have reported this post before.")
                 return
             
             post = PostModel.get_by_id(self.conn, self.post_id)
             if post and post.getAuthor() == user_id:
-                QMessageBox.warning(self, "Peringatan", "Anda tidak dapat melaporkan post Anda sendiri.")
+                QMessageBox.warning(self, "Warning", "You can't report your own post.")
                 return
         
         if ReportForm:
             dialog = QDialog(self)
-            dialog.setWindowTitle("Laporkan Post")
+            dialog.setWindowTitle("Report Post")
             dialog.setModal(True)
             
             report_form = ReportForm(self.post_id, dialog)
@@ -517,10 +517,9 @@ class DisplayPost(QWidget):
             dialog.exec_()
     
     def _handle_report_submission(self, post_id: int, violation_type: str, additional_details: str, dialog=None):
-        """Menangani submit report dari form."""
         if not self.conn or not Report:
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Error", "Koneksi database tidak tersedia.")
+            QMessageBox.critical(self, "Error", "Database connection unavailable.")
             if dialog:
                 dialog.close()
             return
@@ -531,7 +530,7 @@ class DisplayPost(QWidget):
         
         if not user_model or not hasattr(user_model, 'userID') or not user_model.userID:
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Peringatan", "Anda harus login untuk melaporkan post.")
+            QMessageBox.warning(self, "Warning", "You need to login to report post.")
             if dialog:
                 dialog.close()
             return
@@ -556,11 +555,11 @@ class DisplayPost(QWidget):
             report.create_report(self.conn)
             
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Berhasil", "Laporan Anda telah dikirim. Terima kasih!")
+            QMessageBox.information(self, "Success", "Your report have been delivered. Thank you!")
             
             if dialog:
                 dialog.accept()
             
         except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Error", f"Gagal mengirim laporan: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to deliver report: {e}")

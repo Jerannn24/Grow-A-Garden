@@ -149,7 +149,6 @@ class Post:
         conn.commit()
 
     def mark_unavailable(self, conn: sqlite3.Connection):
-        """Soft-remove the post by marking it as unavailable."""
         if self.postID is None:
             return
         try:
