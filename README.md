@@ -107,7 +107,7 @@ python src/main.py
 | **13524005** | PostManager, Post, SharePost, DisplayCommunity, DisplayPost, HomeScreen, MainWindow, CommunityHeader, Sidebar, AppHeader, HomePage        |
 | **13524015** | Report, AdminActionForm, AdminReportDisplay, DisplayPost, Post, HomeScreen, MainWindow, ReportForm, create_admin, Sidebar, UserModel      |
 | **13524045** | ToDoListManager, Task, ActivityRecordPopUp, ChangePasswordPopUp, DisplaySettings, DisplayToDoList, FlowLayout, AddPlantForm, PlantDetails |
-| **13524051** | PlantManager, Plant, AddPlantCard, AppHeader, HomePage, MainWindow, PlantCard, AddPlantForm, PlantDetails, RemovePlantForm                |
+| **13524051** | PlantManager, Plant, AddPlantCard, AppHeader, HomePage, MainWindow, PlantCard, AddPlantForm, PlantDetails, RemovePlantForm, NotificationManager, TaskNotification, DisplayNotification                |
 | **13524055** | AccountManager, UserModel, MainWindow, Sidebar, DisplayProfile, FormChangePassword, FormChangeProfile, FormLogin, FormRegister            |
 
 ## Database
@@ -272,3 +272,4 @@ Menyimpan informasi akun pengguna dan status profil.
 | water_vol_multiplier  | REAL      | Pengali volume air.            |
 | fert_freq_multiplier  | REAL      | Pengali frekuensi pupuk.       |
 | note                  | TEXT      | Catatan.                       |
+
