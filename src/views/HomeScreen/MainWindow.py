@@ -106,11 +106,6 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.settings_page) 
         self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
-        
-        # Placeholder for reports page so navigation index stays stable
-        self._reports_placeholder = QWidget()
-        self._reports_placeholder.setVisible(False)
-        self.pages.addWidget(self._reports_placeholder)  # index 4 (placeholder)
 
         self.nav_buttons = self.sidebar.get_nav_buttons()
         
