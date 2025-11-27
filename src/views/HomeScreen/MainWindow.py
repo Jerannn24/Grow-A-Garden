@@ -246,7 +246,9 @@ class MainWindow(QMainWindow):
         
         if target_plant and self.current_user:
             self.detail_page.populate_data(target_plant, self.current_user.getUserID())
-            self.pages.setCurrentIndex(4) 
+            detail_index = self.pages.indexOf(self.detail_page)
+            if detail_index != -1:
+                self.pages.setCurrentIndex(detail_index)
             for btn in self.nav_buttons.values():
                 btn.setChecked(False)
         else:
