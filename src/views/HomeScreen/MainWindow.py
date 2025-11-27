@@ -173,6 +173,7 @@ class MainWindow(QMainWindow):
         # Connect settings page signals
         self.settings_page.password_changed.connect(self.handle_password_change)
         self.settings_page.settings_changed.connect(self.handle_settings_change)
+        self.settings_page.logoutRequested.connect(self._emit_logout_request)
     
     def set_current_user(self, user_model):
         self.current_user = user_model
@@ -206,7 +207,6 @@ class MainWindow(QMainWindow):
             if self.reports_page is None and AdminReportDisplay and self.conn:
                 self.reports_page = AdminReportDisplay(DB_FILE_PATH, self.conn, user_model, self)
                 try:
-
                     placeholder = self._reports_placeholder
                     self.pages.removeWidget(placeholder)
                 except Exception:
@@ -219,6 +219,9 @@ class MainWindow(QMainWindow):
                         lambda checked, i=4, b=self.nav_buttons["reports"]: 
                         self._switch_page_and_update_sidebar(i, b)
                     )
+
+    def _emit_logout_request(self):
+        self.logoutRequested.emit()
         
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)

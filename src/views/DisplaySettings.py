@@ -13,6 +13,7 @@ class DisplaySettings(QWidget):
     # Signals
     password_changed = pyqtSignal(str, str)  # Emits (new_password, confirm_password)
     settings_changed = pyqtSignal(dict)  # Emits dict with changed settings
+    logoutRequested = pyqtSignal()
     
     def __init__(self, parent=None, user_model=None):
         super().__init__(parent)
@@ -64,6 +65,30 @@ class DisplaySettings(QWidget):
         
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
+
+        # Logout button at the bottom
+        logout_container = QHBoxLayout()
+        logout_container.setContentsMargins(0, 20, 0, 0)
+        logout_container.addStretch()
+        self.btn_logout = QPushButton("Log Out")
+        self.btn_logout.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_logout.setFixedHeight(48)
+        self.btn_logout.setStyleSheet("""
+            QPushButton {
+                background-color: #D32F2F;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-weight: bold;
+                padding: 0 32px;
+            }
+            QPushButton:hover {
+                background-color: #B71C1C;
+            }
+        """)
+        self.btn_logout.clicked.connect(self.on_logout_clicked)
+        logout_container.addWidget(self.btn_logout)
+        main_layout.addLayout(logout_container)
     
     def create_notifications_section(self, parent_layout):
         """Create notifications settings section"""
@@ -226,3 +251,7 @@ class DisplaySettings(QWidget):
         
         self.email_checkbox.blockSignals(False)
         self.push_checkbox.blockSignals(False)
+
+    def on_logout_clicked(self):
+        """Emit logout request to parent container"""
+        self.logoutRequested.emit()
