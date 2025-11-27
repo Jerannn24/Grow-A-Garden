@@ -7,6 +7,7 @@ from PyQt5.QtGui import QFont, QCursor
 from models.Task import Task
 from models.Plant import Plant
 from views.ActivityRecordPopUp import ActivityRecordPopUp
+from views.PlantGrowthForm import PlantGrowthForm
 import datetime
 
 class DisplayToDoList(QWidget):
@@ -133,7 +134,8 @@ class DisplayToDoList(QWidget):
             "water": "💧",
             "fertilize": "🌱",
             "light": "☀️",
-            "harvest": "🌾"
+            "harvest": "🌾",
+            "update": "📈"
         }
         
         # Description map
@@ -141,7 +143,8 @@ class DisplayToDoList(QWidget):
             "water": "Water your plant",
             "fertilize": "Apply fertilizer",
             "light": "Provide sunlight",
-            "harvest": "Ready to harvest!"
+            "harvest": "Ready to harvest!",
+            "update": "Log growth (height & leaf color)"
         }
         
         # Group tasks by plant and add them
@@ -218,7 +221,7 @@ class DisplayToDoList(QWidget):
             btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
             
             # Connect button to show popup
-            btn.clicked.connect(lambda: self.show_activity_popup(task))
+            btn.clicked.connect(lambda checked=False, t=task: self.show_activity_popup(t))
             
             row.addWidget(lbl_icon)
             row.addLayout(text_layout, 1)
@@ -236,6 +239,10 @@ class DisplayToDoList(QWidget):
     
     def show_activity_popup(self, task):
         """Show the activity record popup and mark task as done when confirmed"""
+        if task.actionType == "update":
+            self.show_growth_form(task)
+            return
+
         popup = ActivityRecordPopUp(task=task, parent=self)
         popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
         popup.exec_()
@@ -250,3 +257,18 @@ class DisplayToDoList(QWidget):
             self.populate_tasks(self.user_id)
         except Exception as e:
             print(f"❌ Error marking task as done: {e}")
+
+    def show_growth_form(self, task):
+        popup = PlantGrowthForm(task=task, parent=self)
+        popup.confirmed.connect(lambda height, color: self.on_growth_logged(task, height, color))
+        popup.exec_()
+
+    def on_growth_logged(self, task, height, color):
+        try:
+            Task.completeTask(task.taskID, 1)
+            if self.user_id:
+                Task.scheduleGrowthUpdate(self.user_id, task.plantID)
+            print(f"📈 Growth recorded for plant {task.plantID}: {height} cm, {color}")
+            self.populate_tasks(self.user_id)
+        except Exception as exc:
+            print(f"❌ Failed to finalize growth update: {exc}")

@@ -376,7 +376,7 @@ class Task:
             if action_type:
                 actions = [action_type]
             else:
-                actions = ["water", "fertilize", "harvest", "light"]
+                actions = ["water", "fertilize", "harvest", "light", "update"]
 
             for action in actions:
 
@@ -418,7 +418,10 @@ class Task:
                         continue
 
                 else:
-                    continue
+                    if action == "update":
+                        interval = timedelta(days=7)
+                    else:
+                        continue
                 
                 print(f"[DEBUG-REGEN]   Action '{action}' interval: {interval}")
 
@@ -468,6 +471,16 @@ class Task:
                         INSERT INTO tasks (user_id, plant_id, action_type, quantity, status, deadline)
                         VALUES (?, ?, ?, ?, 0, ?)
                     """, (user_id, pid, action, 0, next_time.strftime("%Y-%m-%d %H:%M:%S")))
+                elif action == "update":
+                    tasks_added = 0
+                    while next_time <= seven_days_after:
+                        cursor.execute("""
+                            INSERT INTO tasks (user_id, plant_id, action_type, quantity, status, deadline)
+                            VALUES (?, ?, ?, ?, 0, ?)
+                        """, (user_id, pid, action, 0, next_time.strftime("%Y-%m-%d %H:%M:%S")))
+                        tasks_added += 1
+                        next_time += interval
+                    print(f"[DEBUG-REGEN]     INSERT {tasks_added} 'update' tasks")
                 else:
                     task_count = 0
                     while next_time <= seven_days_after:
@@ -500,3 +513,40 @@ class Task:
         conn.commit()
         conn.close()
         print(f"[DEBUG] Task {task_id} marked as complete with quantity {actual_quantity}")
+
+    @staticmethod
+    def scheduleGrowthUpdate(user_id, plant_id, start_from=None):
+        """Create the next 'update' task exactly 7 days after the provided base time."""
+        base_time = start_from or datetime.now()
+        due_time = base_time + timedelta(days=7)
+
+        conn = Task.getConnectionApp()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM tasks
+                WHERE user_id = ? AND plant_id = ? AND action_type = 'update'
+                AND status = 0 AND datetime(deadline) BETWEEN datetime('now') AND datetime('now', '+7 days')
+                """,
+                (user_id, plant_id)
+            )
+            already_exists = cursor.fetchone()[0]
+            if already_exists:
+                return False
+
+            cursor.execute(
+                """
+                INSERT INTO tasks (user_id, plant_id, action_type, quantity, status, deadline)
+                VALUES (?, ?, 'update', 0, 0, ?)
+                """,
+                (user_id, plant_id, due_time.strftime("%Y-%m-%d %H:%M:%S"))
+            )
+            conn.commit()
+            return True
+        except Exception as exc:
+            print(f"[DEBUG] scheduleGrowthUpdate failed: {exc}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
