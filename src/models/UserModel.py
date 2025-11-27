@@ -155,9 +155,9 @@ class UserModel:
             query = "INSERT INTO users (username, email, password, location, profileInfo, timeCreated) VALUES (?, ?, ?, ?, ?, ?)"
             conn.execute(query, (username, email, password, location, profileInfo, self.timeCreated))
             conn.commit()
-            return True, "Registration Sucess!"
+            return True, "Registration Success!"
         except sqlite3.IntegrityError:
-            return False, "Username atau email sudah terdaftar!"
+            return False, "Username or Email already exists!"
         finally:
             conn.close()
 
@@ -169,11 +169,11 @@ class UserModel:
             user_row = cursor.fetchone()
 
             if not user_row:
-                return None, "Email atau password salah!"
+                return None, "Email or password incorrect!"
 
             user_instance = UserModel.fromRowSQL(user_row)
             if not user_instance:
-                return None, "Email atau password salah!"
+                return None, "Email or password incorrect!"
 
             from datetime import datetime
             suspended_until = getattr(user_instance, 'suspendedUntil', None)
@@ -189,9 +189,9 @@ class UserModel:
                 pass
 
             if user_instance.status == 'banned':
-                msg = "Akun diblokir permanen."
+                msg = "Account Permanently Banned."
                 if ban_reason:
-                    msg += f" Alasan: {ban_reason}"
+                    msg += f" Reason: {ban_reason}"
                 return None, msg
 
             if user_instance.status == 'suspended':
@@ -206,17 +206,17 @@ class UserModel:
                             minutes = (delta.seconds % 3600) // 60
                             parts = []
                             if days:
-                                parts.append(f"{days} hari")
+                                parts.append(f"{days} days")
                             if hours:
-                                parts.append(f"{hours} jam")
+                                parts.append(f"{hours} hours")
                             if minutes:
-                                parts.append(f"{minutes} menit")
-                            remaining = ", ".join(parts) if parts else "beberapa detik"
+                                parts.append(f"{minutes} minutes")
+                            remaining = ", ".join(parts) if parts else "a few seconds"
                             try:
                                 friendly = dt.strftime("%d %b %Y %H:%M")
                             except Exception:
                                 friendly = suspended_until
-                            return None, f"Akun ditangguhkan. Sisa waktu suspend: {remaining} (sampai {friendly})."
+                            return None, f"Account Suspended. Remaining suspension time: {remaining} (until {friendly})."
                         else:
                             conn2 = self.get_conn()
                             try:
@@ -227,12 +227,12 @@ class UserModel:
                             user_instance.status = 'active'
                             user_instance.suspendedUntil = None
                     except Exception:
-                        return None, "Akun ditangguhkan."
+                        return None, "Account Suspended."
                 else:
-                    return None, "Akun ditangguhkan."
+                    return None, "Account Suspended."
 
             user_instance.password = ""
-            return user_instance, "Login berhasil!"
+            return user_instance, "Login Success!"
         finally:
             conn.close()
 

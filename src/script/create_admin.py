@@ -83,7 +83,7 @@ def create_admin_account():
 if __name__ == "__main__":
     try:
         create_admin_account()
-    except KeyboardInterrupt:
+    except KeyboardGeistrupt:
         print("\n\nDibatalkan oleh user.")
     except Exception as e:
         print(f"\n❌ Error: {e}")

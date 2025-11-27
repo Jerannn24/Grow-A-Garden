@@ -275,9 +275,7 @@ class LoginForm(QWidget):
         centerLayout.addWidget(frame)
         return centerWidget
     
-    def displayError(self, message):
-        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
-        
+    def displayError(self, message):        
         msgBox = QMessageBox() 
         
         msgBox.setIcon(QMessageBox.NoIcon) 
@@ -355,7 +353,6 @@ class LoginForm(QWidget):
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
         )
 
-        # tampilkan pesan error/penolakan login
         self.errorDisplay.connect(lambda msg: self.errorLabel.setText(msg))
         
     def clearForm(self):
@@ -368,8 +365,8 @@ if __name__ == '__main__':
     window.showMaximized()
     
     def handle_login(email, password):
-        print(f"Login attempt: {email}, {password}")
-        QTimer.singleShot(500, lambda: window.errorDisplay.emit("Email atau password yang Anda masukkan tidak valid. Silakan periksa kembali kredensial Anda atau gunakan fitur lupa password."))
+            print(f"Login attempt: {email}, {password}")
+            QTimer.singleShot(500, lambda: window.errorDisplay.emit("Email or password you entered is invalid. Please check your credentials again or use the forgot password feature."))
 
     window.loginRequested.connect(handle_login)
 
