@@ -48,7 +48,7 @@ class LoginForm(QWidget):
         frameLayout.setContentsMargins(65, 55, 65, 50)
         
         iconSize = 160
-        svgFilePath = "public/icon.svg" 
+        svgFilePath = "src/public/icon.svg" 
         
         iconToAdd = None 
         svgWidget = QSvgWidget() 
@@ -84,7 +84,7 @@ class LoginForm(QWidget):
         frameLayout.addWidget(appDesc)
         
         frameLayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Fixed))
-
+        
         def createFeatureItem(iconText, title, description,r,g,b,opacity):
             featureWidget = QWidget()
             featureLayout = QHBoxLayout(featureWidget)
@@ -197,9 +197,15 @@ class LoginForm(QWidget):
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         
+        # Error label (untuk menampilkan pesan login gagal / suspend / ban)
+        self.errorLabel = QLabel("")
+        self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px;")
+        formLayout.addWidget(self.errorLabel)
+
         # Tombol Login
         loginButton = QPushButton("Sign In")
         loginButton.setFont(QFont('Geist', 14, QFont.Bold))
+        self.loginButton.setDefault(True)
         
         # Styling Tombol
         loginButton.setStyleSheet("""
@@ -270,9 +276,7 @@ class LoginForm(QWidget):
         centerLayout.addWidget(frame)
         return centerWidget
     
-    def displayError(self, message):
-        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
-        
+    def displayError(self, message):        
         msgBox = QMessageBox() 
         
         msgBox.setIcon(QMessageBox.NoIcon) 
@@ -343,12 +347,35 @@ class LoginForm(QWidget):
         msgBox.exec_() 
         
     def _setupConnections(self):
-        self.errorDisplay.connect(self.displayError) 
+        self.errorDisplay.connect(self.displayError)
         self.forgotLink.linkActivated.connect(self.switchToChangePassword.emit)
-        self.signupLink.linkActivated.connect(self.switchToRegisterRequested.emit) 
+        self.signupLink.linkActivated.connect(self.switchToRegisterRequested.emit)
         self.loginButton.clicked.connect(lambda: 
             self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
         )
+        self.errorDisplay.connect(lambda msg: self.errorLabel.setText(msg))
+
+        # Allow pressing Enter (Return) in the fields to trigger login
+        try:
+            self.inputEmail.returnPressed.connect(self.loginButton.click)
+            self.inputPass.returnPressed.connect(self.loginButton.click)
+        except Exception:
+            # Fallback: override keyPressEvent on widget
+            pass
+
+    def keyPressEvent(self, event):
+        # Support pressing Enter anywhere in the form to perform submit
+        from PyQt5.QtCore import Qt as _Qt
+        if event.key() in (_Qt.Key_Return, _Qt.Key_Enter):
+            # Only trigger when the current focus isn't a QLineEdit —
+            # QLineEdit.returnPressed is already connected to the button to avoid duplicates
+            focused = self.focusWidget()
+            from PyQt5.QtWidgets import QLineEdit as _QLineEdit
+            if not isinstance(focused, _QLineEdit):
+                # User pressed Enter while focus is elsewhere in the form
+                self.loginRequested.emit(self.inputEmail.text(), self.inputPass.text())
+        else:
+            super().keyPressEvent(event)
         
     def clearForm(self):
         self.inputEmail.clear()
@@ -360,8 +387,8 @@ if __name__ == '__main__':
     window.showMaximized()
     
     def handle_login(email, password):
-        print(f"Login attempt: {email}, {password}")
-        QTimer.singleShot(500, lambda: window.errorDisplay.emit("Email atau password yang Anda masukkan tidak valid. Silakan periksa kembali kredensial Anda atau gunakan fitur lupa password."))
+            print(f"Login attempt: {email}, {password}")
+            QTimer.singleShot(500, lambda: window.errorDisplay.emit("Email or password you entered is invalid. Please check your credentials again or use the forgot password feature."))
 
     window.loginRequested.connect(handle_login)
 

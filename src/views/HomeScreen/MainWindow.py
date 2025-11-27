@@ -1,6 +1,7 @@
 import sqlite3
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QDialog, QSystemTrayIcon
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QIcon
 
 from models.UserModel import DB_FILE_PATH
 from models.Post import Post
@@ -9,11 +10,20 @@ from .Sidebar import Sidebar
 from .AppHeader import AppHeader
 from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
+from controllers.ToDoListManager import ToDoListManager
+from views.DisplaySettings import DisplaySettings
 
+try:
+    from views.AdminReportDisplay import AdminReportDisplay
+    from models.Report import Report
+except ImportError:
+    AdminReportDisplay = None
+    Report = None
 
 from models.UserModel import UserModel
 from typing import Optional
 from views.DisplayProfile import DisplayProfile
+from views.DisplayNotification import DisplayNotification 
 STYLE_SHEET = """
     QMainWindow { background-color: #F8F9FA; }
     
@@ -26,7 +36,7 @@ STYLE_SHEET = """
         text-align: left;
         padding: 12px 20px;
         border: none;
-        font-size: 14px;
+        font-size: 18px;
         border-radius: 8px;
     }
     QPushButton.nav-btn:hover { background-color: #006600; }
@@ -50,7 +60,7 @@ STYLE_SHEET = """
 
 class MainWindow(QMainWindow):
     logoutRequested = pyqtSignal()
-    
+    profileUpdateRequested = pyqtSignal(str, str, str, str)
     def __init__(self):
         super().__init__()
         self.current_user: Optional[UserModel] = None
@@ -78,25 +88,40 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         right_layout.addWidget(self.pages)
         
+        self.todo_page = ToDoListManager(self.current_user)
+        self.settings_page = DisplaySettings(user_model=None) 
+
+        self.conn = None
+        self._setup_db()
+        
         main_layout.addWidget(right_widget)
-        # inisiasi halaman home
+ 
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
-        self.todo_page = QWidget() 
-        self.settings_page = QWidget() 
+        self.todo_page = ToDoListManager(self.current_user)
+        self.settings_page = DisplaySettings(user_model=None)
+        
+        self.reports_page = None
         self.detail_page = PlantDetails()
 
         self.profile_page = DisplayProfile(self.current_user, self)
         
         self.setStyleSheet(STYLE_SHEET)
-        # Tambahkan ke Stacked Widget
-        self.pages.addWidget(self.home_page)      # index 0 (Home)
-        self.pages.addWidget(self.community_page) # index 1 (Community)
-        self.pages.addWidget(self.todo_page)      # index 2 (Todo)
-        self.pages.addWidget(self.settings_page)  # index 3 (Settings)
-        self.pages.addWidget(self.detail_page)    # index 4 (Plant Details)
+ 
+        self.pages.addWidget(self.home_page)      
+        self.pages.addWidget(self.community_page) 
+        self.pages.addWidget(self.todo_page)      
+        self.pages.addWidget(self.settings_page) 
+        self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
+        self.pages.setCurrentIndex(0)
+
         
+        # Placeholder for reports page so navigation index stays stable
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder)  # index 4 (placeholder)
+
         self.nav_buttons = self.sidebar.get_nav_buttons()
         
         self.nav_mapping = {
@@ -105,11 +130,15 @@ class MainWindow(QMainWindow):
             self.nav_buttons["todo"]: 2,
             self.nav_buttons["settings"]: 3,
         }
+        if "reports" in self.nav_buttons:
+            # Report index 4
+            self.nav_mapping[self.nav_buttons["reports"]] = 4
         
         for btn, index in self.nav_mapping.items():
             btn.clicked.connect(lambda checked, i=index, b=btn: self._switch_page_and_update_sidebar(i, b))
 
         self.init_connections()
+        
         
     def init_connections(self):
         if hasattr(self.sidebar, 'connect_profile_action'):
@@ -121,6 +150,12 @@ class MainWindow(QMainWindow):
 
         self.home_page.openDetailRequested.connect(self.show_plant_details)
         self.detail_page.backRequested.connect(self.go_back_to_home)
+        
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.backRequested.connect(self.go_back_to_home)
+        
+        self.settings_page.password_changed.connect(self.handle_password_change)
+        self.settings_page.settings_changed.connect(self.handle_settings_change)
     
         
     def displayProfile(self):       
@@ -132,12 +167,37 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons.values():
             btn.setChecked(False)
  
+    def _setup_db(self):
+        """Setup database connection."""
+        try:
+            self.conn = sqlite3.connect(DB_FILE_PATH)
+            self.conn.row_factory = sqlite3.Row
+            if Report:
+                Report.create_table(self.conn)
+        except Exception as e:
+            print(f"❌ Error setting up database: {e}")
+            self.conn = None
+    
+        
+        # Connect todo page back button
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.backRequested.connect(self.go_back_to_home)
+        
+        # Connect settings page signals
+        self.settings_page.password_changed.connect(self.handle_password_change)
+        self.settings_page.settings_changed.connect(self.handle_settings_change)
+        self.settings_page.logoutRequested.connect(self._emit_logout_request)
+    
     def set_current_user(self, user_model):
         self.current_user = user_model
         
+        self.settings_page.user_model = user_model
+        
         if hasattr(self.sidebar, 'update_profile_button'):
             self.sidebar.update_profile_button(user_model)
-
+            
+        self.profile_page.update_user_data(user_model)
+        
         user_lbl = self.sidebar.findChild(QLabel, 'user_info_label')
         if user_lbl:
             user_lbl.setText(f"👤 {user_model.username}\nID: {user_model.userID}")
@@ -147,6 +207,34 @@ class MainWindow(QMainWindow):
         
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
+        
+        if isinstance(self.todo_page, ToDoListManager):
+            self.todo_page.set_current_user(user_model)
+
+        is_admin = user_model.role == "admin"
+        self.sidebar.set_admin_mode(is_admin)
+        
+        if is_admin:
+            if self.reports_page is None and AdminReportDisplay and self.conn:
+                self.reports_page = AdminReportDisplay(DB_FILE_PATH, self.conn, user_model, self)
+                try:
+                    placeholder = self._reports_placeholder
+                    self.pages.removeWidget(placeholder)
+                except Exception:
+                    pass
+                self.pages.insertWidget(4, self.reports_page)
+
+                if "reports" in self.nav_buttons:
+                    self.nav_mapping[self.nav_buttons["reports"]] = 4
+                    self.nav_buttons["reports"].clicked.connect(
+                        lambda checked, i=4, b=self.nav_buttons["reports"]: 
+                        self._switch_page_and_update_sidebar(i, b)
+                    )
+
+    def _emit_logout_request(self):
+        if self.home_page:
+            self.home_page.set_current_user_id(None)
+        self.logoutRequested.emit()
         
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)
@@ -159,19 +247,130 @@ class MainWindow(QMainWindow):
         
         if index == 1 and hasattr(self.community_page, 'post_manager') and hasattr(self.community_page.post_manager, 'reload_list'):
              self.community_page.post_manager.reload_list()
+        
+        if index == 2 and isinstance(self.todo_page, ToDoListManager):
+             self.todo_page.refresh_tasks()
     
     def show_plant_details(self, plant_id):
         print(f"Navigasi ke Detail Tanaman ID: {plant_id}")
         
         target_plant = next((p for p in self.home_page.plant_manager.plantList if p.plantID == plant_id), None)
         
-        if target_plant:
-            self.detail_page.populate_data(target_plant)
-            self.pages.setCurrentIndex(4) 
+        if target_plant and self.current_user:
+            self.detail_page.populate_data(target_plant, self.current_user.getUserID())
+            detail_index = self.pages.indexOf(self.detail_page)
+            if detail_index != -1:
+                self.pages.setCurrentIndex(detail_index)
             for btn in self.nav_buttons.values():
                 btn.setChecked(False)
         else:
-            print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            if not target_plant:
+                print(f"Error: Data tanaman ID {plant_id} tidak ditemukan di memory.")
+            else:
+                print("Error: User belum login")
 
     def go_back_to_home(self):
         self._switch_page_and_update_sidebar(0, self.nav_buttons["home"])
+    
+    def handle_settings_change(self, settings: dict):
+        """Handle when settings are changed"""
+        if not self.current_user:
+            print("⚠️ Cannot save settings because no user is logged in.")
+            return
+
+        if self.conn is None:
+            print("⚠️ Database connection not available; settings not saved.")
+            return
+
+        email_enabled = bool(settings.get('email_notifications'))
+        push_enabled = bool(settings.get('push_notifications'))
+
+        if email_enabled and push_enabled:
+            preference_value = 'all'
+        elif email_enabled:
+            preference_value = 'email'
+        elif push_enabled:
+            preference_value = 'push'
+        else:
+            preference_value = 'none'
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE users SET notificationPreferences = ? WHERE userID = ?",
+                (preference_value, self.current_user.getUserID())
+            )
+            self.conn.commit()
+            self.current_user.notificationPreferences = preference_value
+            print(f"✅ Settings updated for {self.current_user.getUsername()}: {preference_value}")
+        except sqlite3.Error as exc:
+            self.conn.rollback()
+            print(f"❌ Failed to save settings: {exc}")
+    
+    def handle_password_change(self, new_password: str, confirm_password: str):
+        """Handle password change request"""
+        if new_password != confirm_password:
+            print("Passwords do not match!")
+            return
+        
+        if len(new_password) < 8:
+            print("Password must be at least 8 characters!")
+            return
+        
+        if not self.current_user:
+            print("⚠️ Cannot change password because no user is logged in.")
+            return
+
+        try:
+            success, message = self.current_user.changePassword(
+                self.current_user.getUsername(),
+                self.current_user.getEmail(),
+                new_password,
+                confirm_password
+            )
+        except Exception as exc:
+            print(f"❌ Error while updating password: {exc}")
+            return
+
+        if success:
+            self.current_user.password = ""
+            print(f"✅ Password updated for user: {self.current_user.getUsername()}")
+        else:
+            print(f"❌ Password update failed: {message}")
+        if self.current_user:
+            print(f"Password change requested for user: {self.current_user.getUsername()}")
+    
+    def _remove_on_top(self):
+        self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
+        self.show()
+
+        self.raise_()
+        self.activateWindow()
+
+        print("DEBUG: ON-TOP removed, window forced to front")
+
+
+    def receiveNotif(self, title, message, notifID=None):
+        """
+        Menerima sinyal dari NotificationManager.
+        Memilih cara menampilkan notifikasi berdasarkan status window.
+        """
+        
+        if self.isVisible():
+            popup = DisplayNotification.show_notification(title, message, self)
+            
+        else:
+            top_window = self.window()
+            if hasattr(top_window, 'tray_icon'):
+                top_window.tray_icon.showMessage(
+                    title,
+                    message,
+                    QSystemTrayIcon.Warning,
+                    5000 
+                )
+        if notifID:
+            try:
+                from models.TaskNotification import TaskNotification
+                TaskNotification.mark_as_sended(notifID)
+            except Exception:
+                pass

@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QSpacerItem, QSizePolicy, QGraphicsDropShadowEffect,
-    QMessageBox # <-- Diperlukan untuk Pop-up
+    QMessageBox
 )
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtGui import QFont, QColor
@@ -39,14 +39,12 @@ class ChangePasswordForm(QWidget):
         
         self._setupConnections()
 
-    def displayError(self, message):
-        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
-        
+    def displayError(self, message):        
         msgBox = QMessageBox() 
         
         msgBox.setIcon(QMessageBox.NoIcon) 
         msgBox.setWindowTitle("Reset Password Failed")
-        msgBox.setText("❌ Penggantian Kata Sandi Gagal")
+        msgBox.setText("❌ Reset Password Failed")
         msgBox.setInformativeText(message) 
         msgBox.setStandardButtons(QMessageBox.Ok)
         
@@ -200,7 +198,7 @@ class ChangePasswordForm(QWidget):
         descLayout.addSpacerItem(QSpacerItem(40, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         frameLayout.addLayout(descLayout)
         return frame
-    # ------------------------------------------------
+    
     
     def _createRightPanel(self):
         centerWidget = QWidget()
@@ -227,17 +225,15 @@ class ChangePasswordForm(QWidget):
         formLayout = QVBoxLayout(frame)
         formLayout.setContentsMargins(50, 65, 50, 65)
         
-        title = QLabel("Reset Kata Sandi")
+        title = QLabel("Reset Password")
         title.setFont(QFont('Geist', 28, QFont.Bold)) 
         formLayout.addWidget(title)
         
-        subtitle = QLabel("Masukkan detail untuk mengatur ulang kata sandi")
+        subtitle = QLabel("Enter details to reset your password")
         subtitle.setStyleSheet("color: #666; margin-bottom: 25px;")
         formLayout.addWidget(subtitle)
         
-        # errorLabel tidak ditampilkan di layout (diganti pop-up)
-        # self.errorLabel.setStyleSheet("color: red; margin-bottom: 10px; font-weight: bold;")
-        # formLayout.addWidget(self.errorLabel) 
+        
         
         def createFormField(labelText, placeholderText, isPassword=False, lineEditObject=None):
             label = QLabel(labelText)
@@ -270,17 +266,17 @@ class ChangePasswordForm(QWidget):
         formLayout.addWidget(labelEmail)
         formLayout.addWidget(self.inputEmail)
         
-        labelNewPass, _ = createFormField("Kata Sandi Baru", "Masukkan kata sandi baru", isPassword=True, lineEditObject=self.inputNewPass)
+        labelNewPass, _ = createFormField("New Password", "Enter new password", isPassword=True, lineEditObject=self.inputNewPass)
         formLayout.addWidget(labelNewPass)
         formLayout.addWidget(self.inputNewPass)
 
-        labelConfirmPass, _ = createFormField("Konfirmasi Kata Sandi Baru", "Konfirmasi kata sandi baru", isPassword=True, lineEditObject=self.inputConfirmPass)
+        labelConfirmPass, _ = createFormField("Confirm New Password", "Confirm new password", isPassword=True, lineEditObject=self.inputConfirmPass)
         formLayout.addWidget(labelConfirmPass)
         formLayout.addWidget(self.inputConfirmPass)
         
-        self.changeButton.setText("Reset Kata Sandi")
+        self.changeButton.setText("Reset Password")
         self.changeButton.setFont(QFont('Geist', 14, QFont.Bold))
-        
+        self.changeButton.setDefault(True)
         self.changeButton.setStyleSheet("""
             QPushButton {
                 background-color: #076804;
@@ -308,20 +304,38 @@ class ChangePasswordForm(QWidget):
         formLayout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         centerLayout.addWidget(frame)
+                
         return centerWidget
 
     def _setupConnections(self):
-        self.error_display.connect(self.displayError) 
-        
-        self.changeButton.clicked.connect(lambda: 
+        self.error_display.connect(self.displayError)
+
+        self.changeButton.clicked.connect(lambda:
             self.changePasswordRequested.emit(
-                self.inputUsername.text(),     
-                self.inputEmail.text(),      
-                self.inputNewPass.text(),      
-                self.inputConfirmPass.text()  
+                self.inputUsername.text(),
+                self.inputEmail.text(),
+                self.inputNewPass.text(),
+                self.inputConfirmPass.text()
             )
         )
         self.backLinkWidget.linkActivated.connect(lambda: self.switchToLoginRequested.emit())
+
+        self.inputUsername.returnPressed.connect(self.changeButton.click)
+        self.inputEmail.returnPressed.connect(self.changeButton.click)
+        self.inputNewPass.returnPressed.connect(self.changeButton.click)
+        self.inputConfirmPass.returnPressed.connect(self.changeButton.click)
+
+    def keyPressEvent(self, event):
+        from PyQt5.QtCore import Qt as _Qt
+        if event.key() in (_Qt.Key_Return, _Qt.Key_Enter):
+            focused = self.focusWidget()
+            from PyQt5.QtWidgets import QLineEdit as _QLineEdit
+            if not isinstance(focused, _QLineEdit):
+                self.changeButton.click()
+            else:
+                return
+        else:
+            super().keyPressEvent(event)
         
     def clearForm(self):
         self.inputUsername.clear()
@@ -339,15 +353,14 @@ if __name__ == '__main__':
         print(f"Password reset attempt for: {username}, {email}")
         
         if new_pass != confirm_pass:
-            message = "Kata Sandi Baru dan Konfirmasi Kata Sandi tidak cocok. Mohon ulangi."
-        elif len(new_pass) < 6:
-            message = "Kata Sandi harus memiliki minimal 6 karakter."
+            message = "New Password and Confirm New Password do not match. Please try again."
+        elif len(new_pass) < 8:
+            message = "Password must be at least 8 characters long."
         else:
-            message = "Username atau Email tidak ditemukan dalam sistem kami."
+            message = "Username or Email not found in our system."
             
         QTimer.singleShot(500, lambda: window.error_display.emit(message))
 
     window.changePasswordRequested.connect(handle_change_password)
-    # --------------------------------------------------------------
 
     sys.exit(app.exec_())

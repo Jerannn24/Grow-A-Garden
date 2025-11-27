@@ -2,14 +2,24 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QScrollArea, QGridLayout
 )
+import sqlite3
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
+from models.Plant import Plant
+from models.Task import Task
+from models.UserModel import GUIDE_FILE_PATH
+from views.ActivityRecordPopUp import ActivityRecordPopUp
+from views.PlantGrowthForm import PlantGrowthForm
+import datetime
 
 class PlantDetails(QWidget):
     backRequested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
+        
+        self.user_id = None
+        self.plant_id = None
         
         self.setStyleSheet("""
             QWidget { background-color: #F8F9FA; }
@@ -52,8 +62,7 @@ class PlantDetails(QWidget):
 
         # Setup Kartu
         self.setup_info_card()
-        self.setup_todo_card()
-
+        self.todo_card = None  
         self.content_layout.addStretch()
         scroll.setWidget(self.content_widget)
         main_layout.addWidget(scroll)
@@ -120,7 +129,7 @@ class PlantDetails(QWidget):
         rec_layout.setContentsMargins(15, 12, 15, 12)
         
         self.rec_label = QLabel("⚠️ Needs watering urgently! (Placeholder Recommendation)")
-        self.rec_label.setStyleSheet("color: #C62828; font-weight: bold; font-size: 14px; border: none;")
+        self.rec_label.setStyleSheet(self._label_style("#C62828"))
         
         rec_layout.addWidget(self.rec_label)
         main_card_layout.addWidget(self.rec_box)
@@ -152,62 +161,287 @@ class PlantDetails(QWidget):
         return lbl_val
 
     def setup_todo_card(self):
-        card = QFrame()
-        card.setObjectName("CardFrame")
-        layout = QVBoxLayout(card)
+        if not self.user_id or not self.plant_id:
+            return
+        
+        # Remove old todo card if it exists
+        if self.todo_card is not None:
+            self.content_layout.removeWidget(self.todo_card)
+            self.todo_card.deleteLater()
+        
+        # Fetch tasks for this specific plant
+        overdue_tasks = Task.getOverdueTasks(user_id=self.user_id, plant_id=self.plant_id)
+        today_tasks = Task.getTodaysTodo(user_id=self.user_id, plant_id=self.plant_id)
+        week_tasks = Task.getWeeksTodo(user_id=self.user_id, plant_id=self.plant_id)
+        completed_tasks = Task.getCompletedTasks(user_id=self.user_id, plant_id=self.plant_id)
+        
+        icon_map = {
+            "water": "💧",
+            "fertilize": "🌱",
+            "light": "☀️",
+            "harvest": "🌾",
+            "update": "📈"
+        }
+
+        desc_map = {
+            "water": "Water your plant",
+            "fertilize": "Apply fertilizer",
+            "light": "Provide sunlight",
+            "harvest": "Ready to harvest!",
+            "update": "Log growth (height & leaf color)"
+        }
+
+        self.todo_card = QFrame()
+        self.todo_card.setObjectName("CardFrame")
+        layout = QVBoxLayout(self.todo_card)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
-        
-        title = QLabel("Daily Tasks")
+
+        title = QLabel("Plant Tasks")
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
-        
-        self.create_task_item(layout, "💧", "Water Plant (Overdue)", "Complete yesterday's watering task. Recommended: 100ml", True)
-        self.create_task_item(layout, "🌱", "Apply Fertilizer", "Recommended: 2 grams NPK", False)
-        
-        self.content_layout.addWidget(card)
 
-    def create_task_item(self, parent, icon, title, desc, is_urgent):
+        has_tasks = False
+
+        def add_task_section(section_title, tasks_dict, is_urgent=False):
+            nonlocal has_tasks
+            if not tasks_dict:
+                return
+            section_label = QLabel(section_title)
+            section_label.setStyleSheet(
+                f"font-size: 14px; font-weight: bold; color: {'#D32F2F' if is_urgent else '#2E7D32'}; margin-top: 10px;"
+            )
+            section_has_items = False
+            for task_list in tasks_dict.values():
+                for task in task_list:
+                    if self._should_hide_update_task(task):
+                        continue
+                    if not section_has_items:
+                        layout.addWidget(section_label)
+                        section_has_items = True
+                    icon = icon_map.get(task.actionType, "📋")
+                    title_text = task.actionType.capitalize()
+                    desc = desc_map.get(task.actionType, "Task")
+                    self.create_task_item(
+                        layout,
+                        icon,
+                        title_text,
+                        desc,
+                        is_urgent,
+                        task.deadline,
+                        task
+                    )
+                    has_tasks = True
+
+        add_task_section("⚠️ Overdue", overdue_tasks, is_urgent=True)
+        add_task_section("📅 Today", today_tasks)
+        add_task_section("📆 This Week", week_tasks)
+
+        if completed_tasks:
+            section_label = QLabel("✓ Completed")
+            section_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2E7D32; margin-top: 10px;")
+            layout.addWidget(section_label)
+            for task_list in completed_tasks.values():
+                for task in task_list:
+                    icon = icon_map.get(task.actionType, "📋")
+                    title_text = task.actionType.capitalize()
+                    desc = desc_map.get(task.actionType, "Task")
+                    self.create_task_item(
+                        layout,
+                        icon,
+                        title_text,
+                        desc,
+                        False,
+                        task.deadline,
+                        None
+                    )
+
+        if not has_tasks and not completed_tasks:
+            empty_label = QLabel("No tasks for this plant. Great work! 🎉")
+            empty_label.setStyleSheet("color: #999; font-size: 14px; text-align: center;")
+            empty_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(empty_label)
+
+        self.content_layout.addWidget(self.todo_card)
+
+    def create_task_item(self, parent, icon, title, desc, is_urgent, deadline=None, task=None):
         item_frame = QFrame()
         bg = "#FFF3E0" if is_urgent else "white"
         border = "#FFCC80" if is_urgent else "#EEEEEE"
         item_frame.setStyleSheet(f"background-color: {bg}; border: 1px solid {border}; border-radius: 12px;")
-        
+
         row = QHBoxLayout(item_frame)
         row.setContentsMargins(20, 15, 20, 15)
         row.setSpacing(20)
-        # Pastikan item di dalam task list juga vertical center
-        row.setAlignment(Qt.AlignVCenter) 
-        
+        row.setAlignment(Qt.AlignVCenter)
+
         lbl_icon = QLabel(icon)
         lbl_icon.setFont(QFont("Arial", 24))
-        
+
         text_layout = QVBoxLayout()
         text_layout.setSpacing(4)
-        
+
         t_color = "#D32F2F" if is_urgent else "#333"
         lbl_t = QLabel(title)
         lbl_t.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {t_color}; border: none; background: transparent;")
+
         lbl_d = QLabel(desc)
-        lbl_d.setStyleSheet("color: #666; font-size: 13px; border: none; background: transparent;")
-        lbl_d.setWordWrap(True)
+        lbl_d.setStyleSheet("color: #666; font-size: 12px; border: none; background: transparent;")
+
+        if deadline:
+            try:
+                if isinstance(deadline, datetime.datetime):
+                    deadline_text = deadline.strftime("%Y-%m-%d %H:%M")
+                else:
+                    deadline_text = str(deadline)
+            except Exception:
+                deadline_text = "No deadline"
+            lbl_deadline = QLabel(f"Due: {deadline_text}")
+            lbl_deadline.setStyleSheet("color: #999; font-size: 11px; border: none; background: transparent; font-style: italic;")
+            text_layout.addWidget(lbl_deadline)
+
         text_layout.addWidget(lbl_t)
         text_layout.addWidget(lbl_d)
-        
-        btn = QPushButton("Input")
-        btn.setCursor(QCursor(Qt.PointingHandCursor))
-        btn.setFixedSize(80, 38)
-        btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
-        
-        row.addWidget(lbl_icon)
-        row.addLayout(text_layout, 1)
-        row.addWidget(btn)
-        parent.addWidget(item_frame)
 
-    def populate_data(self, plant_obj):
+        if task:
+            btn = QPushButton("Input")
+            btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setFixedSize(80, 38)
+            btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
+            btn.clicked.connect(lambda checked=False, t=task: self.show_activity_popup(t))
+
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(btn)
+        else:
+            chk_label = QLabel("✓")
+            chk_label.setStyleSheet("color: #2E7D32; font-size: 24px; font-weight: bold;")
+            row.addWidget(lbl_icon)
+            row.addLayout(text_layout, 1)
+            row.addWidget(chk_label)
+
+        parent.addWidget(item_frame)
+    
+    def show_activity_popup(self, task):
+        """Show the activity record popup and mark task as done when confirmed"""
+        if task.actionType == "update":
+            popup = PlantGrowthForm(task=task, parent=self)
+            popup.confirmed.connect(lambda height, color: self.on_growth_logged(task, height, color))
+            popup.exec_()
+            return
+
+        popup = ActivityRecordPopUp(task=task, parent=self)
+        popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
+        popup.exec_()
+    
+    def on_task_confirmed(self, task, quantity):
+        """Mark the task as done when user confirms activity"""
+        try:
+            # Update task as completed with actual quantity
+            Task.completeTask(task.taskID, quantity)
+            print(f"✅ Task {task.taskID} marked as done with quantity {quantity}")
+            # Refresh the task display
+            self.setup_todo_card()
+        except Exception as e:
+            print(f"❌ Error marking task as done: {e}")
+
+    def on_growth_logged(self, task, height, color):
+        try:
+            Task.completeTask(task.taskID, 1)
+            if self.user_id and task.plantID:
+                Task.regenerateTask(self.user_id, action_type="update", plant_id=task.plantID)
+            print(f"📈 Growth recorded for plant {task.plantID}: {height} cm, {color}")
+            self._update_recommendation(color)
+            self.setup_todo_card()
+        except Exception as exc:
+            print(f"❌ Failed to log growth update: {exc}")
+
+    def _should_hide_update_task(self, task):
+        if task is None or task.actionType != "update":
+            return False
+        deadline = task.deadline
+        if not deadline:
+            return False
+        try:
+            if not isinstance(deadline, datetime.datetime):
+                deadline = datetime.datetime.fromisoformat(str(deadline))
+        except Exception:
+            return False
+        return deadline - datetime.datetime.now() > datetime.timedelta(days=7)
+
+    def populate_data(self, plant_obj: Plant, user_id: int):
+        self.user_id = user_id
+        self.plant_id = plant_obj.getPlantID()
+        
+        water_percent = Task.getCarePercentage(plant_obj.plantID, "water")
+        light_percent = Task.getCarePercentage(plant_obj.plantID, "light")
         self.lbl_name.setText(plant_obj.getPlantName())
         self.lbl_species.setText(plant_obj.getPlantSpecies())
-        self.lbl_sun_val.setText(plant_obj.getLightingDuration())
+        self.lbl_water_val.setText(f"{water_percent * 100:.1f}%")
+        self.lbl_sun_val.setText(f"{light_percent * 100:.1f}%")
         
         icon = getattr(plant_obj, 'icon', '🌿') 
         self.icon_label.setText(icon)
+        self._update_recommendation(getattr(plant_obj, 'leafColor', None))
+        
+        # Refresh todo card with actual user and plant data
+        self.setup_todo_card()
+
+    def _update_recommendation(self, leaf_color):
+        default_message = "Plant looks healthy. Keep up the good care!"
+        default_box_style, default_text_color = self._style_for_color("green", return_default=True)
+        if not leaf_color:
+            self.rec_label.setText(default_message)
+            self.rec_box.setStyleSheet(default_box_style)
+            self.rec_label.setStyleSheet(self._label_style(default_text_color))
+            return
+
+        conn = None
+        row = None
+        try:
+            conn = sqlite3.connect(GUIDE_FILE_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT user_message FROM diagnostics WHERE LOWER(symptom_color) = LOWER(?) LIMIT 1",
+                (str(leaf_color),)
+            )
+            row = cursor.fetchone()
+        except Exception as exc:
+            print(f"[PlantDetails] Failed to load recommendation: {exc}")
+        finally:
+            if conn:
+                conn.close()
+
+        if row:
+            if isinstance(row, sqlite3.Row):
+                message = row["user_message"]
+                color_name = row["symptom_color"] if "symptom_color" in row.keys() else leaf_color
+            else:
+                message = row[0]
+                color_name = leaf_color
+            box_style, text_color = self._style_for_color(color_name)
+            self.rec_label.setText(message)
+            self.rec_box.setStyleSheet(box_style)
+            self.rec_label.setStyleSheet(self._label_style(text_color))
+        else:
+            self.rec_label.setText(default_message)
+            self.rec_box.setStyleSheet(default_box_style)
+            self.rec_label.setStyleSheet(self._label_style(default_text_color))
+
+    def _style_for_color(self, color_name, return_default=False):
+        mapping = {
+            "green": ("background-color: #E8F5E9; border-radius: 12px; border: 1px solid #C8E6C9;", "#1B5E20"),
+            "yellow": ("background-color: #FFF8E1; border-radius: 12px; border: 1px solid #FFE082;", "#8C6D1F"),
+            "brown": ("background-color: #EFEBE9; border-radius: 12px; border: 1px solid #D7CCC8;", "#4E342E"),
+            "black": ("background-color: #ECEFF1; border-radius: 12px; border: 1px solid #CFD8DC;", "#263238"),
+            "pale": ("background-color: #F1F8E9; border-radius: 12px; border: 1px solid #DCEDC8;", "#33691E")
+        }
+        key = str(color_name).lower()
+        for option, styles in mapping.items():
+            if option in key:
+                return styles
+        return mapping["green"] if not return_default else mapping["green"]
+
+    def _label_style(self, color):
+        return f"color: {color}; font-weight: bold; font-size: 14px; border: none;"
