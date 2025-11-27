@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from controllers.PlantManager import PlantManager
 from views.AddPlantForm import AddPlantForm
 from views.RemovePlantForm import RemovePlantForm
+from models.Task import Task
 from .PlantCard import PlantCard
 from .AddPlantCard import AddPlantCard
 from .FlowLayout import FlowLayout
@@ -66,7 +67,8 @@ class HomePage(QWidget):
             p_phase = plant.getPlantPhase()
             p_harvest = plant.getHarvestEstim()
             p_sun = plant.getLightingDuration() 
-            p_water = plant.getWateringFrequency()
+            water = Task.getCarePercentage(plant.plantID, "water")
+            p_water = (f"{water * 100:.1f}%")
 
             stats = {"🌱": p_media, "🔄": p_phase, "📅": p_harvest, "☀️": p_sun, "💧": p_water}
             
