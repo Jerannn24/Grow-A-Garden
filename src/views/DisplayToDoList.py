@@ -152,6 +152,8 @@ class DisplayToDoList(QWidget):
             # Get plant name
             plant_name = Plant.getPlantNameByID(plant_id)
             for task in sorted(task_list, key=lambda t: t.deadline):
+                if self._should_hide_update_task(task):
+                    continue
                 icon = icon_map.get(task.actionType, "📋")
                 title_text = task.actionType.capitalize()
                 desc = desc_map.get(task.actionType, "Task")
@@ -267,8 +269,21 @@ class DisplayToDoList(QWidget):
         try:
             Task.completeTask(task.taskID, 1)
             if self.user_id:
-                Task.scheduleGrowthUpdate(self.user_id, task.plantID)
+                Task.regenerateTask(self.user_id, action_type="update", plant_id=task.plantID)
             print(f"📈 Growth recorded for plant {task.plantID}: {height} cm, {color}")
             self.populate_tasks(self.user_id)
         except Exception as exc:
             print(f"❌ Failed to finalize growth update: {exc}")
+
+    def _should_hide_update_task(self, task):
+        if task is None or task.actionType != "update":
+            return False
+        deadline = task.deadline
+        if not deadline:
+            return False
+        try:
+            if not isinstance(deadline, datetime.datetime):
+                deadline = datetime.datetime.fromisoformat(str(deadline))
+        except Exception:
+            return False
+        return deadline - datetime.datetime.now() > datetime.timedelta(days=7)

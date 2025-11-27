@@ -7,6 +7,7 @@ from PyQt5.QtGui import QFont, QCursor
 from models.Plant import Plant
 from models.Task import Task
 from views.ActivityRecordPopUp import ActivityRecordPopUp
+from views.PlantGrowthForm import PlantGrowthForm
 import datetime
 
 class PlantDetails(QWidget):
@@ -172,67 +173,68 @@ class PlantDetails(QWidget):
         week_tasks = Task.getWeeksTodo(user_id=self.user_id, plant_id=self.plant_id)
         completed_tasks = Task.getCompletedTasks(user_id=self.user_id, plant_id=self.plant_id)
         
-        # Icon and description maps
         icon_map = {
             "water": "💧",
             "fertilize": "🌱",
             "light": "☀️",
-            "harvest": "🌾"
+            "harvest": "🌾",
+            "update": "📈"
         }
-        
+
         desc_map = {
             "water": "Water your plant",
             "fertilize": "Apply fertilizer",
             "light": "Provide sunlight",
-            "harvest": "Ready to harvest!"
+            "harvest": "Ready to harvest!",
+            "update": "Log growth (height & leaf color)"
         }
-        
-        # Create main card
+
         self.todo_card = QFrame()
         self.todo_card.setObjectName("CardFrame")
         layout = QVBoxLayout(self.todo_card)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
-        
+
         title = QLabel("Plant Tasks")
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
-        
-        # Display tasks by category
+
         has_tasks = False
-        
-        # Helper function to display tasks with section header
+
         def add_task_section(section_title, tasks_dict, is_urgent=False):
             nonlocal has_tasks
-            if tasks_dict:
-                has_tasks = True
-                # Add section header
-                section_label = QLabel(section_title)
-                section_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {'#D32F2F' if is_urgent else '#2E7D32'}; margin-top: 10px;")
-                layout.addWidget(section_label)
-                
-                # Add tasks under this section
-                for task_list in tasks_dict.values():
-                    for task in task_list:
-                        icon = icon_map.get(task.actionType, "📋")
-                        title_text = task.actionType.capitalize()
-                        desc = desc_map.get(task.actionType, "Task")
-                        self.create_task_item(
-                            layout,
-                            icon,
-                            title_text,
-                            desc,
-                            is_urgent,
-                            task.deadline,
-                            task
-                        )
-        
-        # Add sections in order
+            if not tasks_dict:
+                return
+            section_label = QLabel(section_title)
+            section_label.setStyleSheet(
+                f"font-size: 14px; font-weight: bold; color: {'#D32F2F' if is_urgent else '#2E7D32'}; margin-top: 10px;"
+            )
+            section_has_items = False
+            for task_list in tasks_dict.values():
+                for task in task_list:
+                    if self._should_hide_update_task(task):
+                        continue
+                    if not section_has_items:
+                        layout.addWidget(section_label)
+                        section_has_items = True
+                    icon = icon_map.get(task.actionType, "📋")
+                    title_text = task.actionType.capitalize()
+                    desc = desc_map.get(task.actionType, "Task")
+                    self.create_task_item(
+                        layout,
+                        icon,
+                        title_text,
+                        desc,
+                        is_urgent,
+                        task.deadline,
+                        task
+                    )
+                    has_tasks = True
+
         add_task_section("⚠️ Overdue", overdue_tasks, is_urgent=True)
-        add_task_section("📅 Today", today_tasks, is_urgent=False)
-        add_task_section("📆 This Week", week_tasks, is_urgent=False)
-        
-        # Completed tasks section
+        add_task_section("📅 Today", today_tasks)
+        add_task_section("📆 This Week", week_tasks)
+
         if completed_tasks:
             section_label = QLabel("✓ Completed")
             section_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2E7D32; margin-top: 10px;")
@@ -249,16 +251,15 @@ class PlantDetails(QWidget):
                         desc,
                         False,
                         task.deadline,
-                        None  # No task object for completed tasks
+                        None
                     )
-        
-        # No tasks message
+
         if not has_tasks and not completed_tasks:
             empty_label = QLabel("No tasks for this plant. Great work! 🎉")
             empty_label.setStyleSheet("color: #999; font-size: 14px; text-align: center;")
             empty_label.setAlignment(Qt.AlignCenter)
             layout.addWidget(empty_label)
-        
+
         self.content_layout.addWidget(self.todo_card)
 
     def create_task_item(self, parent, icon, title, desc, is_urgent, deadline=None, task=None):
@@ -266,70 +267,67 @@ class PlantDetails(QWidget):
         bg = "#FFF3E0" if is_urgent else "white"
         border = "#FFCC80" if is_urgent else "#EEEEEE"
         item_frame.setStyleSheet(f"background-color: {bg}; border: 1px solid {border}; border-radius: 12px;")
-        
+
         row = QHBoxLayout(item_frame)
         row.setContentsMargins(20, 15, 20, 15)
         row.setSpacing(20)
         row.setAlignment(Qt.AlignVCenter)
-        
-        # Icon
+
         lbl_icon = QLabel(icon)
         lbl_icon.setFont(QFont("Arial", 24))
-        
-        # Text layout (title, description, deadline)
+
         text_layout = QVBoxLayout()
         text_layout.setSpacing(4)
-        
+
         t_color = "#D32F2F" if is_urgent else "#333"
         lbl_t = QLabel(title)
         lbl_t.setStyleSheet(f"font-weight: bold; font-size: 15px; color: {t_color}; border: none; background: transparent;")
-        
+
         lbl_d = QLabel(desc)
         lbl_d.setStyleSheet("color: #666; font-size: 12px; border: none; background: transparent;")
-        
-        # Format deadline safely
-        deadline_text = ""
+
         if deadline:
             try:
                 if isinstance(deadline, datetime.datetime):
                     deadline_text = deadline.strftime("%Y-%m-%d %H:%M")
                 else:
                     deadline_text = str(deadline)
-            except:
+            except Exception:
                 deadline_text = "No deadline"
             lbl_deadline = QLabel(f"Due: {deadline_text}")
             lbl_deadline.setStyleSheet("color: #999; font-size: 11px; border: none; background: transparent; font-style: italic;")
             text_layout.addWidget(lbl_deadline)
-        
+
         text_layout.addWidget(lbl_t)
         text_layout.addWidget(lbl_d)
-        
-        # Input button (only for incomplete tasks)
+
         if task:
             btn = QPushButton("Input")
             btn.setCursor(QCursor(Qt.PointingHandCursor))
             btn.setFixedSize(80, 38)
             btn.setStyleSheet("QPushButton { background-color: #FF6F00; color: white; border-radius: 8px; font-weight: bold; border: none; } QPushButton:hover { background-color: #E65100; }")
-            
-            # Connect button to show popup
-            btn.clicked.connect(lambda: self.show_activity_popup(task))
-            
+            btn.clicked.connect(lambda checked=False, t=task: self.show_activity_popup(t))
+
             row.addWidget(lbl_icon)
             row.addLayout(text_layout, 1)
             row.addWidget(btn)
         else:
-            # For completed tasks, show checkmark
             chk_label = QLabel("✓")
             chk_label.setStyleSheet("color: #2E7D32; font-size: 24px; font-weight: bold;")
-            
             row.addWidget(lbl_icon)
             row.addLayout(text_layout, 1)
             row.addWidget(chk_label)
-        
+
         parent.addWidget(item_frame)
     
     def show_activity_popup(self, task):
         """Show the activity record popup and mark task as done when confirmed"""
+        if task.actionType == "update":
+            popup = PlantGrowthForm(task=task, parent=self)
+            popup.confirmed.connect(lambda height, color: self.on_growth_logged(task, height, color))
+            popup.exec_()
+            return
+
         popup = ActivityRecordPopUp(task=task, parent=self)
         popup.confirmed.connect(lambda qty: self.on_task_confirmed(task, qty))
         popup.exec_()
@@ -344,6 +342,29 @@ class PlantDetails(QWidget):
             self.setup_todo_card()
         except Exception as e:
             print(f"❌ Error marking task as done: {e}")
+
+    def on_growth_logged(self, task, height, color):
+        try:
+            Task.completeTask(task.taskID, 1)
+            if self.user_id and task.plantID:
+                Task.regenerateTask(self.user_id, action_type="update", plant_id=task.plantID)
+            print(f"📈 Growth recorded for plant {task.plantID}: {height} cm, {color}")
+            self.setup_todo_card()
+        except Exception as exc:
+            print(f"❌ Failed to log growth update: {exc}")
+
+    def _should_hide_update_task(self, task):
+        if task is None or task.actionType != "update":
+            return False
+        deadline = task.deadline
+        if not deadline:
+            return False
+        try:
+            if not isinstance(deadline, datetime.datetime):
+                deadline = datetime.datetime.fromisoformat(str(deadline))
+        except Exception:
+            return False
+        return deadline - datetime.datetime.now() > datetime.timedelta(days=7)
 
     def populate_data(self, plant_obj: Plant, user_id: int):
         self.user_id = user_id
