@@ -115,6 +115,18 @@ class Post:
         cur.execute("DELETE FROM postList WHERE postID = ?", (self.postID,))
         conn.commit()
 
+    def mark_unavailable(self, conn: sqlite3.Connection):
+        if self.postID is None:
+            return
+        try:
+            Post.ensure_availability_column(conn)
+            cur = conn.cursor()
+            cur.execute("UPDATE postList SET isAvailable = 0 WHERE postID = ?", (self.postID,))
+            conn.commit()
+            self.isAvailable = 0
+        except Exception:
+            pass
+
     def incViewCount(self, conn: sqlite3.Connection):
         self.viewCount += 1
         if self.postID is not None:

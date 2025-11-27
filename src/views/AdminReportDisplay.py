@@ -33,7 +33,7 @@ class AdminReportDisplay(QWidget):
         
         top_row = QHBoxLayout()
         top_row.setContentsMargins(0, 0, 0, 0)
-        title_label = QLabel("📋 Dashboard Laporan")
+        title_label = QLabel("📋 Report Dashboard")
         title_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
         top_row.addWidget(title_label)
         top_row.addStretch()
@@ -44,7 +44,7 @@ class AdminReportDisplay(QWidget):
         top_row.addWidget(refresh_btn)
         header_layout.addLayout(top_row)
 
-        subtitle_label = QLabel("Kelola semua laporan dari pengguna")
+        subtitle_label = QLabel("Manage all reports from users")
         subtitle_label.setStyleSheet("color: rgba(255,255,255,0.9); font-size: 12px;")
         header_layout.addWidget(subtitle_label)
         
@@ -61,7 +61,7 @@ class AdminReportDisplay(QWidget):
         list_layout.setContentsMargins(0, 0, 0, 0)
         list_layout.setSpacing(0)
         
-        list_header = QLabel("Daftar Laporan")
+        list_header = QLabel("Report List")
         list_header.setStyleSheet("""
             padding: 15px;
             background-color: #F8F9FA;
@@ -102,7 +102,7 @@ class AdminReportDisplay(QWidget):
         detail_layout.setContentsMargins(20, 20, 20, 20)
         detail_layout.setSpacing(15)
         
-        self.detail_header = QLabel("Pilih laporan untuk melihat detail")
+        self.detail_header = QLabel("Select report to view details")
         self.detail_header.setStyleSheet("font-size: 16px; font-weight: bold; color: #333;")
         detail_layout.addWidget(self.detail_header)
         
@@ -124,7 +124,7 @@ class AdminReportDisplay(QWidget):
         action_btn_layout = QHBoxLayout(self.action_btn_container)
         action_btn_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.action_btn = QPushButton("⚡ Tindakan Admin")
+        self.action_btn = QPushButton("⚡ Take Action")
         self.action_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007F00;
@@ -152,7 +152,6 @@ class AdminReportDisplay(QWidget):
         layout.addLayout(content_layout)
     
     def load_reports(self):
-        """Memuat semua report untuk admin."""
         if not self.conn:
             return
         
@@ -160,7 +159,7 @@ class AdminReportDisplay(QWidget):
         reports = Report.get_all_reports_for_admin(self.conn)
         
         if not reports:
-            no_report_item = QListWidgetItem("Tidak ada laporan")
+            no_report_item = QListWidgetItem("No report")
             no_report_item.setFlags(Qt.NoItemFlags)
             self.report_list.addItem(no_report_item)
             return
@@ -200,7 +199,7 @@ class AdminReportDisplay(QWidget):
             widget_layout.setContentsMargins(10, 10, 10, 10)
             widget_layout.setSpacing(5)
             
-            count_badge = QLabel(f"🔴 {report_count} Laporan")
+            count_badge = QLabel(f"🔴 {report_count} Report")
             count_badge.setStyleSheet("""
                 color: #FF4444;
                 font-weight: bold;
@@ -219,7 +218,7 @@ class AdminReportDisplay(QWidget):
                 content_label.setWordWrap(True)
                 widget_layout.addWidget(content_label)
             
-            info_label = QLabel(f"Pelapor: {reporter_name} • {first_report.violationType}")
+            info_label = QLabel(f"Reporter: {reporter_name} • {first_report.violationType}")
             info_label.setStyleSheet("font-size: 11px; color: #999; margin-top: 5px;")
             widget_layout.addWidget(info_label)
             
@@ -230,11 +229,10 @@ class AdminReportDisplay(QWidget):
             self.report_list.setItemWidget(item, widget)
 
     def _manual_refresh(self):
-        """Manual refresh handler for the admin - reloads report list and clears detail view."""
         try:
             self.load_reports()
         except Exception as e:
-            print(f"⚠️ Gagal memuat ulang laporan: {e}")
+            print(f"⚠️ Failed to load reports: {e}")
 
         self.current_report = None
         self.action_btn.hide()
@@ -242,10 +240,9 @@ class AdminReportDisplay(QWidget):
             child = self.detail_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
-        self.detail_header.setText("Pilih laporan untuk melihat detail")
+        self.detail_header.setText("Select a report to view details")
     
     def _on_report_clicked(self, item: QListWidgetItem):
-        """Ketika report diklik, tampilkan detail."""
         report_id = item.data(Qt.UserRole)
         if not report_id:
             return
@@ -258,7 +255,6 @@ class AdminReportDisplay(QWidget):
         self.action_btn.show()
     
     def _show_report_detail(self, report: Report):
-        """Menampilkan detail report."""
         while self.detail_layout.count():
             child = self.detail_layout.takeAt(0)
             if child.widget():
@@ -266,10 +262,10 @@ class AdminReportDisplay(QWidget):
         
         post = Post.get_by_id(self.conn, report.postID)
         if not post:
-            self.detail_header.setText("Post tidak ditemukan")
+            self.detail_header.setText("Post not found")
             return
         
-        self.detail_header.setText("Detail Laporan")
+        self.detail_header.setText("Report Details")
         
         post_frame = QFrame()
         post_frame.setStyleSheet("""
@@ -282,17 +278,17 @@ class AdminReportDisplay(QWidget):
         post_layout = QVBoxLayout(post_frame)
         post_layout.setSpacing(10)
         
-        post_title_label = QLabel("Post yang Dilaporkan:")
+        post_title_label = QLabel("Post Reported:")
         post_title_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px;")
         post_layout.addWidget(post_title_label)
         
         author_name = Post.getUsernameByID(self.conn, post.getAuthor())
-        author_label = QLabel(f"Oleh: {author_name}")
+        author_label = QLabel(f"By: {author_name}")
         author_label.setStyleSheet("color: #666; font-size: 13px;")
         post_layout.addWidget(author_label)
         
         if post.getTitle():
-            title_label = QLabel(f"Judul: {post.getTitle()}")
+            title_label = QLabel(f"Title: {post.getTitle()}")
             title_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px; margin-top: 5px;")
             title_label.setWordWrap(True)
             post_layout.addWidget(title_label)
@@ -315,31 +311,31 @@ class AdminReportDisplay(QWidget):
         report_layout = QVBoxLayout(report_frame)
         report_layout.setSpacing(10)
         
-        report_title_label = QLabel("Informasi Laporan:")
+        report_title_label = QLabel("Report Information:")
         report_title_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px;")
         report_layout.addWidget(report_title_label)
         
         reporter_name = Report.get_username_by_id(self.conn, report.reporterID)
-        reporter_label = QLabel(f"Pelapor: {reporter_name}")
+        reporter_label = QLabel(f"Reporter: {reporter_name}")
         reporter_label.setStyleSheet("color: #666; font-size: 13px;")
         report_layout.addWidget(reporter_label)
         
-        violation_label = QLabel(f"Jenis Pelanggaran: {report.violationType}")
+        violation_label = QLabel(f"Type of Violation: {report.violationType}")
         violation_label.setStyleSheet("color: #666; font-size: 13px;")
         report_layout.addWidget(violation_label)
         
-        time_label = QLabel(f"Waktu: {report.timeCreated}")
+        time_label = QLabel(f"Time: {report.timeCreated}")
         time_label.setStyleSheet("color: #666; font-size: 13px;")
         report_layout.addWidget(time_label)
         
         if report.additionalDetails:
-            details_label = QLabel(f"Keterangan: {report.additionalDetails}")
+            details_label = QLabel(f"Description: {report.additionalDetails}")
             details_label.setStyleSheet("color: #666; font-size: 13px; margin-top: 10px;")
             details_label.setWordWrap(True)
             report_layout.addWidget(details_label)
         
         report_count = Report.get_report_count_by_post(self.conn, report.postID)
-        count_label = QLabel(f"Total Laporan untuk Post Ini: {report_count}")
+        count_label = QLabel(f"Total Reports For This Post: {report_count}")
         count_label.setStyleSheet("color: #FF4444; font-weight: bold; font-size: 13px; margin-top: 10px;")
         report_layout.addWidget(count_label)
         
@@ -348,12 +344,11 @@ class AdminReportDisplay(QWidget):
         self.detail_layout.addStretch()
     
     def _open_action_form(self):
-        """Membuka form aksi admin."""
         if not self.current_report:
             return
         
         dialog = QDialog(self)
-        dialog.setWindowTitle("Tindakan Admin")
+        dialog.setWindowTitle("Take Action")
         dialog.setModal(True)
         
         reporter_name = Report.get_username_by_id(self.conn, self.current_report.reporterID)
@@ -381,7 +376,6 @@ class AdminReportDisplay(QWidget):
             pass
     
     def _handle_admin_action(self, report_id: int, action: str):
-        """Menangani aksi admin."""
         if not self.conn or not self.admin_user:
             return
         
@@ -403,15 +397,15 @@ class AdminReportDisplay(QWidget):
 
                     cur = self.conn.cursor()
                     info_msg = None
-                    if action == "Ban Permanen":
-                        ban_reason = f"{action} oleh {self.admin_user.username}: {report.violationType}"
+                    if action == "Permanent Ban":
+                        ban_reason = f"{action} by {self.admin_user.username}: {report.violationType}"
                         cur.execute("UPDATE users SET status = 'banned', suspendedUntil = NULL, banReason = ? WHERE userID = ?", (ban_reason, user.userID))
-                        info_msg = f"Akun pengguna diblokir permanen.\nAlasan: {ban_reason}"
+                        info_msg = f"User account permanently blocked.\nReason: {ban_reason}"
                     elif action.startswith("Suspend"):
                         days = 1
-                        if "3 Hari" in action:
+                        if "3 Days" in action:
                             days = 3
-                        elif "7 Hari" in action:
+                        elif "7 Days" in action:
                             days = 7
                         from datetime import datetime, timedelta
                         until_dt = (datetime.now() + timedelta(days=days))
@@ -420,32 +414,32 @@ class AdminReportDisplay(QWidget):
                             friendly = until_dt.strftime("%d %b %Y %H:%M")
                         except Exception:
                             friendly = until
-                        info_msg = f"Akun pengguna ditangguhkan selama {days} hari (sampai {friendly})."
+                        info_msg = f"User account suspended for {days} days (until {friendly})."
                         cur.execute("UPDATE users SET status = 'suspended', suspendedUntil = ? WHERE userID = ?", (until, user.userID))
-                    elif action == "Berikan Peringatan":
+                    elif action == "Delete post":
                         cur.execute("UPDATE users SET reportCount = reportCount + 1 WHERE userID = ?", (user.userID,))
-                        info_msg = "Peringatan telah diberikan kepada pengguna."
+                        info_msg = "Post has been deleted."
                     self.conn.commit()
-                    if action != "Laporan Tidak Valid":
+                    if action != "Report Invalid":
                         try:
                             try:
                                 Post.set_unavailable_by_id(self.conn, report.postID)
                                 if info_msg:
-                                    info_msg = info_msg + "\nPost terkait telah ditandai sebagai tidak tersedia."
+                                    info_msg = info_msg + "\Related post is no longer available."
                                 else:
-                                    info_msg = "Post terkait telah ditandai sebagai tidak tersedia."
+                                    info_msg = "Related post is no longer available."
                             except Exception:
                                 Post.delete_by_id(self.conn, report.postID)
                                 if info_msg:
-                                    info_msg = info_msg + "\nPost terkait telah dihapus."
+                                    info_msg = info_msg + "\Related post deleted."
                                 else:
-                                    info_msg = "Post terkait telah dihapus."
+                                    info_msg = "Related post deleted."
                         except Exception as e:
-                            print(f"⚠ Gagal memproses post {report.postID}: {e}")
+                            print(f"⚠ Failed to process post {report.postID}: {e}")
                     if info_msg:
                         try:
                             parent = getattr(self, '_current_action_dialog', self)
-                            QMessageBox.information(parent, "Tindakan Admin", info_msg)
+                            QMessageBox.information(parent, "Take Action", info_msg)
                         except Exception:
                             pass
             
@@ -457,8 +451,8 @@ class AdminReportDisplay(QWidget):
                 child = self.detail_layout.takeAt(0)
                 if child.widget():
                     child.widget().deleteLater()
-            self.detail_header.setText("Pilih laporan untuk melihat detail")
+            self.detail_header.setText("Select report to view details")
             
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Gagal menerapkan tindakan: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to take action: {e}")
 

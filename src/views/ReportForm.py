@@ -18,7 +18,7 @@ class ReportForm(QWidget):
         layout.setSpacing(20)
         
         # Header
-        header_label = QLabel("📢 Laporkan Post")
+        header_label = QLabel("📢 Report Post")
         header_label.setStyleSheet("""
             font-size: 20px; 
             font-weight: bold; 
@@ -28,12 +28,12 @@ class ReportForm(QWidget):
         layout.addWidget(header_label)
         
         # Subtitle
-        subtitle_label = QLabel("Bantu kami menjaga komunitas tetap aman dan nyaman")
+        subtitle_label = QLabel("Help us keep the community safe and comfortable")
         subtitle_label.setStyleSheet("color: #666; font-size: 13px; margin-bottom: 20px;")
         layout.addWidget(subtitle_label)
         
         # Violation Type
-        violation_label = QLabel("Jenis Pelanggaran *")
+        violation_label = QLabel("Type of Violation *")
         violation_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px;")
         layout.addWidget(violation_label)
         
@@ -57,12 +57,12 @@ class ReportForm(QWidget):
         layout.addWidget(self.violation_combo)
         
         # Additional Details
-        details_label = QLabel("Keterangan Tambahan (Opsional)")
+        details_label = QLabel("Extra Details (Optional)")
         details_label.setStyleSheet("font-weight: bold; color: #333; font-size: 14px; margin-top: 15px;")
         layout.addWidget(details_label)
         
         self.details_text = QTextEdit()
-        self.details_text.setPlaceholderText("Jelaskan lebih detail tentang pelanggaran yang terjadi...")
+        self.details_text.setPlaceholderText("Explain in more detail about the violation that occurred...")
         self.details_text.setMaximumHeight(120)
         self.details_text.setStyleSheet("""
             QTextEdit {
@@ -84,7 +84,7 @@ class ReportForm(QWidget):
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
         
-        self.cancel_btn = QPushButton("Batal")
+        self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #F5F5F5;
@@ -101,7 +101,7 @@ class ReportForm(QWidget):
         """)
         self.cancel_btn.clicked.connect(self.close)
         
-        self.submit_btn = QPushButton("Kirim Laporan")
+        self.submit_btn = QPushButton("Send Report")
         self.submit_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007F00;
@@ -129,9 +129,8 @@ class ReportForm(QWidget):
         additional_details = self.details_text.toPlainText().strip()
         
         if not violation_type:
-            QMessageBox.warning(self, "Peringatan", "Pilih jenis pelanggaran terlebih dahulu.")
+            QMessageBox.warning(self, "Warning", "Select type of violation first.")
             return
         
-        # Emit signal to parent to handle submission
         self.reportSubmitted.emit(self.post_id, violation_type, additional_details)
 

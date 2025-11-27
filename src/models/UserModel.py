@@ -251,11 +251,7 @@ class UserModel:
         
     @classmethod
     def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
-x<<<<<<<<< Temporary merge branch 1
         if row is None:
-=========
-        if row is None or len(row) < 12: 
->>>>>>>>> Temporary merge branch 2
             return None
         
         try:
