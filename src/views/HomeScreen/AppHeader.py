@@ -26,10 +26,10 @@ class AppHeader(QWidget):
         time_col.setSpacing(2)
         
         self.date_lbl = QLabel()
-        self.date_lbl.setStyleSheet("color: gray; font-size: 13px; border: none;")
+        self.date_lbl.setStyleSheet("color: gray; font-size: 16px; border: none;")
         
         self.time_lbl = QLabel() 
-        self.time_lbl.setStyleSheet("font-size: 24px; font-weight: bold; color: #007F00; border: none;")
+        self.time_lbl.setStyleSheet("font-size: 27px; font-weight: bold; color: #007F00; border: none;")
         
         time_col.addWidget(self.date_lbl)
         time_col.addWidget(self.time_lbl)
@@ -64,14 +64,14 @@ class AppHeader(QWidget):
 
         self.title_lbl = QLabel(title_text)
         self.title_lbl.setObjectName("SectionTitle")
-        self.title_lbl.setStyleSheet("font-size: 22px; font-weight: bold; color: #333; border: none;")
+        self.title_lbl.setStyleSheet("font-size: 27px; font-weight: bold; color: #333; border: none;")
         
         title_v_layout.addWidget(self.title_lbl)
 
         if subtitle_text:
             self.subtitle_lbl = QLabel(subtitle_text)
             self.subtitle_lbl.setObjectName("SubTitle")
-            self.subtitle_lbl.setStyleSheet("font-size: 14px; color: gray; border: none;")
+            self.subtitle_lbl.setStyleSheet("font-size: 21px; color: gray; border: none;")
             title_v_layout.addWidget(self.subtitle_lbl)
 
         main_v_layout.addLayout(title_v_layout)

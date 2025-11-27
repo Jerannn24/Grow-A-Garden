@@ -33,7 +33,7 @@ STYLE_SHEET = """
         text-align: left;
         padding: 12px 20px;
         border: none;
-        font-size: 14px;
+        font-size: 18px;
         border-radius: 8px;
     }
     QPushButton.nav-btn:hover { background-color: #006600; }
