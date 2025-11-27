@@ -2,10 +2,12 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QScrollArea, QGridLayout
 )
+import sqlite3
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
 from models.Plant import Plant
 from models.Task import Task
+from models.UserModel import GUIDE_FILE_PATH
 from views.ActivityRecordPopUp import ActivityRecordPopUp
 from views.PlantGrowthForm import PlantGrowthForm
 import datetime
@@ -127,7 +129,7 @@ class PlantDetails(QWidget):
         rec_layout.setContentsMargins(15, 12, 15, 12)
         
         self.rec_label = QLabel("⚠️ Needs watering urgently! (Placeholder Recommendation)")
-        self.rec_label.setStyleSheet("color: #C62828; font-weight: bold; font-size: 14px; border: none;")
+        self.rec_label.setStyleSheet(self._label_style("#C62828"))
         
         rec_layout.addWidget(self.rec_label)
         main_card_layout.addWidget(self.rec_box)
@@ -349,6 +351,7 @@ class PlantDetails(QWidget):
             if self.user_id and task.plantID:
                 Task.regenerateTask(self.user_id, action_type="update", plant_id=task.plantID)
             print(f"📈 Growth recorded for plant {task.plantID}: {height} cm, {color}")
+            self._update_recommendation(color)
             self.setup_todo_card()
         except Exception as exc:
             print(f"❌ Failed to log growth update: {exc}")
@@ -379,6 +382,66 @@ class PlantDetails(QWidget):
         
         icon = getattr(plant_obj, 'icon', '🌿') 
         self.icon_label.setText(icon)
+        self._update_recommendation(getattr(plant_obj, 'leafColor', None))
         
         # Refresh todo card with actual user and plant data
         self.setup_todo_card()
+
+    def _update_recommendation(self, leaf_color):
+        default_message = "Plant looks healthy. Keep up the good care!"
+        default_box_style, default_text_color = self._style_for_color("green", return_default=True)
+        if not leaf_color:
+            self.rec_label.setText(default_message)
+            self.rec_box.setStyleSheet(default_box_style)
+            self.rec_label.setStyleSheet(self._label_style(default_text_color))
+            return
+
+        conn = None
+        row = None
+        try:
+            conn = sqlite3.connect(GUIDE_FILE_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT user_message FROM diagnostics WHERE LOWER(symptom_color) = LOWER(?) LIMIT 1",
+                (str(leaf_color),)
+            )
+            row = cursor.fetchone()
+        except Exception as exc:
+            print(f"[PlantDetails] Failed to load recommendation: {exc}")
+        finally:
+            if conn:
+                conn.close()
+
+        if row:
+            if isinstance(row, sqlite3.Row):
+                message = row["user_message"]
+                color_name = row["symptom_color"] if "symptom_color" in row.keys() else leaf_color
+            else:
+                message = row[0]
+                color_name = leaf_color
+            box_style, text_color = self._style_for_color(color_name)
+            self.rec_label.setText(message)
+            self.rec_box.setStyleSheet(box_style)
+            self.rec_label.setStyleSheet(self._label_style(text_color))
+        else:
+            self.rec_label.setText(default_message)
+            self.rec_box.setStyleSheet(default_box_style)
+            self.rec_label.setStyleSheet(self._label_style(default_text_color))
+
+    def _style_for_color(self, color_name, return_default=False):
+        mapping = {
+            "green": ("background-color: #E8F5E9; border-radius: 12px; border: 1px solid #C8E6C9;", "#1B5E20"),
+            "yellow": ("background-color: #FFF8E1; border-radius: 12px; border: 1px solid #FFE082;", "#8C6D1F"),
+            "brown": ("background-color: #EFEBE9; border-radius: 12px; border: 1px solid #D7CCC8;", "#4E342E"),
+            "black": ("background-color: #ECEFF1; border-radius: 12px; border: 1px solid #CFD8DC;", "#263238"),
+            "pale": ("background-color: #F1F8E9; border-radius: 12px; border: 1px solid #DCEDC8;", "#33691E")
+        }
+        key = str(color_name).lower()
+        for option, styles in mapping.items():
+            if option in key:
+                return styles
+        return mapping["green"] if not return_default else mapping["green"]
+
+    def _label_style(self, color):
+        return f"color: {color}; font-weight: bold; font-size: 14px; border: none;"
