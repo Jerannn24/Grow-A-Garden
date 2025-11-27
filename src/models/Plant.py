@@ -136,6 +136,46 @@ class Plant:
             return default_phase, default_harvest
         finally:
             conn.close()
+    
+    def calculate_harvest_estim(self):
+        """
+        Menghitung Tanggal Panen secara Real-Time
+        berdasarkan Database Referensi (GUIDE_FILE_PATH).
+        """
+        
+        # # DEBUGGG
+        # real_now = datetime.now()
+        # fake_today = real_now + timedelta(days=TIME_TRAVEL_DAYS)
+        # age_weeks_now = (fake_today - start_dt).days / 7
+
+        conn = sqlite3.connect(GUIDE_FILE_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            # Cari Species ID
+            cursor.execute("SELECT id FROM species WHERE common_name LIKE ?", (self.plantSpecies,))
+            row = cursor.fetchone()
+            if not row: return datetime.now()
+            
+            species_id = row[0]
+
+            # Cari Harvest Countdown
+            cursor.execute("SELECT min_time_to_harvest_days, max_time_to_harvest_days FROM harvest_info WHERE species_id = ?", (species_id,))
+            harvest_row = cursor.fetchone()
+            
+            if harvest_row:
+                avg_days = (harvest_row[0] + harvest_row[1]) / 2
+
+                target_date = self.plantingStartDate + timedelta(days=avg_days)
+                self.harvestEstim = target_date
+
+                return target_date
+            return datetime.now()
+        except Exception as e:
+            print(f"[Harvest Estimation Error] {e}")
+            return datetime.now()
+        finally:
+            conn.close()
 
     def setRequirements(self):
         conn = sqlite3.connect(GUIDE_FILE_PATH)
@@ -220,6 +260,26 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
         
         print("Tanaman tidak ditemukan!")
         return None
+
+    @staticmethod
+    def getPlantNameByID(plant_id):
+        """Get plant name from database by plantID"""
+        conn = Plant._get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT plantName FROM plants WHERE plantID = ?", (plant_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                plant_name = row['plantName']
+                print(f"[DEBUG] getPlantNameByID: plant_id={plant_id} -> name={plant_name}")
+                return plant_name
+            print(f"[DEBUG] getPlantNameByID: plant_id={plant_id} not found, returning ID")
+            return plant_id  # Return plantID if not found
+        except Exception as e:
+            print(f"[DEBUG] getPlantNameByID error: {e}")
+            conn.close()
+            return plant_id
 
     # SETTER
     def setUserID(self, userID):
@@ -364,7 +424,7 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
         rows = cursor.fetchall()
         conn.close()
 
-        plant_list = []
+        plant_list: list[Plant] = []
         for row in rows:
             p_start_date_str = row['plantingStartDate']
             p_species = row['plantSpecies']
@@ -396,11 +456,9 @@ WHERE base_care_profiles.min_age_weeks <= ? AND base_care_profiles.max_age_weeks
             conn = cls._get_db_connection()
             cursor = conn.cursor()
             
-            # Kueri SQL untuk menghitung baris berdasarkan userID
             query = "SELECT COUNT(*) FROM plants WHERE userID = ?"
             cursor.execute(query, (userID,))
             
-            # Ambil hasilnya. fetchone()[0] akan mengambil nilai COUNT.
             count = cursor.fetchone()[0]
             
             return count
