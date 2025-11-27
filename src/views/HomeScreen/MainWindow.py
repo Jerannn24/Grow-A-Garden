@@ -27,7 +27,7 @@ STYLE_SHEET = """
         text-align: left;
         padding: 12px 20px;
         border: none;
-        font-size: 14px;
+        font-size: 18px;
         border-radius: 8px;
     }
     QPushButton.nav-btn:hover { background-color: #006600; }
@@ -79,12 +79,21 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         right_layout.addWidget(self.pages)
         
-        main_layout.addWidget(right_widget)
- 
+
+        self.conn = None
+        self._setup_db()
+        
+        # inisiasi halaman home
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = ToDoListManager(self.current_user)
-        self.settings_page = DisplaySettings(user_model=None)  # Will be set in set_current_user()
+        self.settings_page = DisplaySettings(user_model=self.current_user)
+        
+        self.reports_page = None
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder) 
+
         self.detail_page = PlantDetails()
 
         self.profile_page = DisplayProfile(self.current_user, self)
@@ -98,6 +107,11 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
         
+        # Placeholder for reports page so navigation index stays stable
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder)  # index 4 (placeholder)
+
         self.nav_buttons = self.sidebar.get_nav_buttons()
         
         self.nav_mapping = {
@@ -141,6 +155,17 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons.values():
             btn.setChecked(False)
  
+    def _setup_db(self):
+        """Setup database connection."""
+        try:
+            self.conn = sqlite3.connect(DB_FILE_PATH)
+            self.conn.row_factory = sqlite3.Row
+            if Report:
+                Report.create_table(self.conn)
+        except Exception as e:
+            print(f"❌ Error setting up database: {e}")
+            self.conn = None
+    
     def set_current_user(self, user_model):
         self.current_user = user_model
         

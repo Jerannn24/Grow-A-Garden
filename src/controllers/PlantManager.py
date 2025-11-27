@@ -69,8 +69,13 @@ class PlantManager:
             new_plant.setRequirements()
             
             print("Manager: Mencoba menyimpan ke Database...")
-            new_plant.addNewPlant() 
-            print("Manager: Berhasil simpan ke DB.")
+            try:
+                new_plant.addNewPlant()
+                print("Manager: Berhasil simpan ke DB.")
+                
+            except Exception as db_error:
+                print(f"Manager DB ERROR: {db_error}")
+                raise db_error 
 
             self.plantList.append(new_plant)
             

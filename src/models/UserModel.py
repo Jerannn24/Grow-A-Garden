@@ -116,24 +116,86 @@ class UserModel:
             query = "INSERT INTO users (username, email, password, location, profileInfo, timeCreated) VALUES (?, ?, ?, ?, ?, ?)"
             conn.execute(query, (username, email, password, location, profileInfo, self.timeCreated))
             conn.commit()
-            return True, "Registration Sucess!"
+            return True, "Registration Success!"
         except sqlite3.IntegrityError:
-            return False, "Username or email used!"
+            return False, "Username or Email already exists!"
+        finally:
+            conn.close()
 
     def loginUser(self, email: str, password: str) -> Tuple[Optional["UserModel"], str]:
         conn = self.get_conn()
-        query = "SELECT * FROM users WHERE email = ? AND password = ?"
-        cursor = conn.execute(query, (email, password))
-        userRow = cursor.fetchone()
+        try:
+            query = "SELECT * FROM users WHERE email = ? AND password = ?"
+            cursor = conn.execute(query, (email, password))
+            user_row = cursor.fetchone()
 
-            
-        if userRow:
-            userInstance = UserModel.fromRowSQL(userRow) 
-            if userInstance:
-                userInstance.password = "" 
-            return userInstance, "Login Success!"
-        else:
-            return None, "Wrong Email or password!"
+            if not user_row:
+                return None, "Email or password incorrect!"
+
+            user_instance = UserModel.fromRowSQL(user_row)
+            if not user_instance:
+                return None, "Email or password incorrect!"
+
+            from datetime import datetime
+            suspended_until = getattr(user_instance, 'suspendedUntil', None)
+            ban_reason = getattr(user_instance, 'banReason', '')
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT suspendedUntil, banReason FROM users WHERE userID = ?", (user_instance.userID,))
+                r = cur.fetchone()
+                if r:
+                    suspended_until = r[0] if isinstance(r, tuple) else (r['suspendedUntil'] if 'suspendedUntil' in r.keys() else suspended_until)
+                    ban_reason = r[1] if isinstance(r, tuple) else (r['banReason'] if 'banReason' in r.keys() else ban_reason)
+            except Exception:
+                pass
+
+            if user_instance.status == 'banned':
+                msg = "Account Permanently Banned."
+                if ban_reason:
+                    msg += f" Reason: {ban_reason}"
+                return None, msg
+
+            if user_instance.status == 'suspended':
+                if suspended_until:
+                    try:
+                        dt = datetime.fromisoformat(suspended_until)
+                        now = datetime.now()
+                        if dt > now:
+                            delta = dt - now
+                            days = delta.days
+                            hours = delta.seconds // 3600
+                            minutes = (delta.seconds % 3600) // 60
+                            parts = []
+                            if days:
+                                parts.append(f"{days} days")
+                            if hours:
+                                parts.append(f"{hours} hours")
+                            if minutes:
+                                parts.append(f"{minutes} minutes")
+                            remaining = ", ".join(parts) if parts else "a few seconds"
+                            try:
+                                friendly = dt.strftime("%d %b %Y %H:%M")
+                            except Exception:
+                                friendly = suspended_until
+                            return None, f"Account Suspended. Remaining suspension time: {remaining} (until {friendly})."
+                        else:
+                            conn2 = self.get_conn()
+                            try:
+                                conn2.execute("UPDATE users SET status = 'active', suspendedUntil = NULL WHERE userID = ?", (user_instance.userID,))
+                                conn2.commit()
+                            finally:
+                                conn2.close()
+                            user_instance.status = 'active'
+                            user_instance.suspendedUntil = None
+                    except Exception:
+                        return None, "Account Suspended."
+                else:
+                    return None, "Account Suspended."
+
+            user_instance.password = ""
+            return user_instance, "Login Success!"
+        finally:
+            conn.close()
 
     def changePassword(self, username:str, email:str, newPassword:str, confirmPassword:str):
         if not email and not username and not newPassword and not confirmPassword:
@@ -189,23 +251,59 @@ class UserModel:
         
     @classmethod
     def fromRowSQL(cls, row: Tuple) -> Optional["UserModel"]:
+x<<<<<<<<< Temporary merge branch 1
+        if row is None:
+=========
         if row is None or len(row) < 12: 
+>>>>>>>>> Temporary merge branch 2
             return None
         
         try:
-            return cls(
-                userID=row[0], username=row[1], password=row[2], email=row[3], 
-                profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7], 
-                location=row[8], notificationPreferences=row[9], notificationTime=row[10],
-                timeCreated=row[11]
-            )
-        except Exception as e:
-            print(f"Error creating UserModel from row: {e}")
+            if isinstance(row, sqlite3.Row):
+                suspended = row['suspendedUntil'] if 'suspendedUntil' in row.keys() else None
+                ban_reason = row['banReason'] if 'banReason' in row.keys() else ''
+                inst = cls(
+                    userID=row['userID'], username=row['username'], password=row['password'], email=row['email'],
+                    profileInfo=row['profileInfo'], role=row['role'], reportCount=row['reportCount'], status=row['status'],
+                    location=row['location'], notificationPreferences=row['notificationPreferences'], notificationTime=row['notificationTime']
+                )
+                inst.suspendedUntil = suspended
+                inst.banReason = ban_reason
+                return inst
+            else:
+                suspended = None
+                if len(row) >= 13:
+                    suspended = row[8]
+                    ban_reason = row[9]
+                    location = row[10] if len(row) > 10 else 'unknown'
+                    notificationPreferences = row[11] if len(row) > 11 else 'all'
+                    notificationTime = row[12] if len(row) > 12 else '08:00'
+                    inst = cls(
+                        userID=row[0], username=row[1], password=row[2], email=row[3],
+                        profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7],
+                        location=location, notificationPreferences=notificationPreferences, notificationTime=notificationTime
+                    )
+                    inst.suspendedUntil = suspended
+                    inst.banReason = ban_reason
+                    return inst
+                else:
+                    inst = cls(
+                        userID=row[0], username=row[1], password=row[2], email=row[3],
+                        profileInfo=row[4], role=row[5], reportCount=row[6], status=row[7],
+                        location=row[8], notificationPreferences=row[9], notificationTime=row[10]
+                    )
+                    inst.suspendedUntil = None
+                    inst.banReason = ''
+                    return inst
+        except Exception:
             return None
 
     @classmethod
     def getByID(cls, user_id: int) -> Optional["UserModel"]:
         conn = cls.get_conn()
-        cur = conn.execute("SELECT * FROM users WHERE userID = ?", (user_id,))
-        row = cur.fetchone()
-        return cls.fromRowSQL(row) if row else None
+        try:
+            cur = conn.execute("SELECT * FROM users WHERE userID = ?", (user_id,))
+            row = cur.fetchone()
+            return cls.fromRowSQL(row) if row else None
+        finally:
+            conn.close()

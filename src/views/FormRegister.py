@@ -276,12 +276,12 @@ class RegisterForm(QWidget):
         formLayout.addWidget(inputLocation)
 
         # Password
-        labelPass, inputPass = createFormField("Password", "••••••••", isPassword=True)
+        labelPass, inputPass = createFormField("Password", "Password", isPassword=True)
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         
         # Confirm Password
-        labelConfirm, inputConfirm = createFormField("Confirm Password", "••••••••", isPassword=True)
+        labelConfirm, inputConfirm = createFormField("Confirm Password", "Confirm password", isPassword=True)
         formLayout.addWidget(labelConfirm)
         formLayout.addWidget(inputConfirm)
         
@@ -340,7 +340,6 @@ class RegisterForm(QWidget):
         )
     
     def clearForm(self):
-        """Membersihkan semua field input."""
         self.inputName.clear()
         self.inputEmail.clear()
         self.inputPass.clear()

@@ -104,7 +104,7 @@ class FormChangeProfile(QDialog):
         profile_info = self.inputProfileInfo.toPlainText().strip()
         
         if not username or not email:
-            self.errorLabel.setText("Username dan Email tidak boleh kosong.")
+            self.errorLabel.setText("Username and Email cannot be empty.")
             return
 
         self.profileUpdateRequested.emit(username, email, location, profile_info)
@@ -131,7 +131,7 @@ class FormChangeProfile(QDialog):
         profile_info = self.inputProfileInfo.toPlainText().strip()
         
         if not username or not email:
-            self.errorLabel.setText("Username dan Email tidak boleh kosong.")
+            self.errorLabel.setText("Username and Email cannot be empty.")
             return
 
         self.profileUpdateRequested.emit(username, email, location, profile_info)
@@ -183,7 +183,7 @@ if __name__ == '__main__':
         def getUsername(self): return "MawarMelati"
         def getEmail(self): return "mawar@example.com"
         def getLocation(self): return "Bandung, Indonesia"
-        def getProfileInfo(self): return "Saya suka berkebun dan menanam mawar merah!"
+        def getProfileInfo(self): return "I enjoy gardening and planting red roses!"
 
     app = QApplication(sys.argv)
     mock_user = MockUser()

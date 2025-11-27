@@ -39,14 +39,12 @@ class ChangePasswordForm(QWidget):
         
         self._setupConnections()
 
-    def displayError(self, message):
-        """Menampilkan pop-up error yang diperlebar dan berpusat, dengan gaya modern."""
-        
+    def displayError(self, message):        
         msgBox = QMessageBox() 
         
         msgBox.setIcon(QMessageBox.NoIcon) 
         msgBox.setWindowTitle("Reset Password Failed")
-        msgBox.setText("❌ Penggantian Kata Sandi Gagal")
+        msgBox.setText("❌ Reset Password Failed")
         msgBox.setInformativeText(message) 
         msgBox.setStandardButtons(QMessageBox.Ok)
         
@@ -227,11 +225,11 @@ class ChangePasswordForm(QWidget):
         formLayout = QVBoxLayout(frame)
         formLayout.setContentsMargins(50, 65, 50, 65)
         
-        title = QLabel("Reset Kata Sandi")
+        title = QLabel("Reset Password")
         title.setFont(QFont('Geist', 28, QFont.Bold)) 
         formLayout.addWidget(title)
         
-        subtitle = QLabel("Masukkan detail untuk mengatur ulang kata sandi")
+        subtitle = QLabel("Enter details to reset your password")
         subtitle.setStyleSheet("color: #666; margin-bottom: 25px;")
         formLayout.addWidget(subtitle)
         
@@ -270,15 +268,15 @@ class ChangePasswordForm(QWidget):
         formLayout.addWidget(labelEmail)
         formLayout.addWidget(self.inputEmail)
         
-        labelNewPass, _ = createFormField("Kata Sandi Baru", "Masukkan kata sandi baru", isPassword=True, lineEditObject=self.inputNewPass)
+        labelNewPass, _ = createFormField("New Password", "Enter new password", isPassword=True, lineEditObject=self.inputNewPass)
         formLayout.addWidget(labelNewPass)
         formLayout.addWidget(self.inputNewPass)
 
-        labelConfirmPass, _ = createFormField("Konfirmasi Kata Sandi Baru", "Konfirmasi kata sandi baru", isPassword=True, lineEditObject=self.inputConfirmPass)
+        labelConfirmPass, _ = createFormField("Confirm New Password", "Confirm new password", isPassword=True, lineEditObject=self.inputConfirmPass)
         formLayout.addWidget(labelConfirmPass)
         formLayout.addWidget(self.inputConfirmPass)
         
-        self.changeButton.setText("Reset Kata Sandi")
+        self.changeButton.setText("Reset Password")
         self.changeButton.setFont(QFont('Geist', 14, QFont.Bold))
         
         self.changeButton.setStyleSheet("""
@@ -339,11 +337,11 @@ if __name__ == '__main__':
         print(f"Password reset attempt for: {username}, {email}")
         
         if new_pass != confirm_pass:
-            message = "Kata Sandi Baru dan Konfirmasi Kata Sandi tidak cocok. Mohon ulangi."
-        elif len(new_pass) < 6:
-            message = "Kata Sandi harus memiliki minimal 6 karakter."
+            message = "New Password and Confirm New Password do not match. Please try again."
+        elif len(new_pass) < 8:
+            message = "Password must be at least 8 characters long."
         else:
-            message = "Username atau Email tidak ditemukan dalam sistem kami."
+            message = "Username or Email not found in our system."
             
         QTimer.singleShot(500, lambda: window.error_display.emit(message))
 

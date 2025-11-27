@@ -187,7 +187,12 @@ class Post:
         """Ambil semua post, delegasi query terpusat di model."""
         mapping = {"timeCreated": "timeCreated", "likes": "likeCount", "views": "viewCount"}
         col = mapping.get(order_by, "timeCreated")
-        q = f"SELECT * FROM postList ORDER BY {col} DESC"
+        try:
+            cls.ensure_availability_column(conn)
+            q = f"SELECT * FROM postList WHERE isAvailable = 1 ORDER BY {col} DESC"
+        except Exception:
+
+            q = f"SELECT * FROM postList ORDER BY {col} DESC"
         params: List[Any] = []
         if limit is not None:
             q += " LIMIT ?"
