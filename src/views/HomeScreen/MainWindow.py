@@ -10,6 +10,13 @@ from .AppHeader import AppHeader
 from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
 
+try:
+    from views.AdminReportDisplay import AdminReportDisplay
+    from models.Report import Report
+except ImportError:
+    AdminReportDisplay = None
+    Report = None
+
 
 from models.UserModel import UserModel
 from typing import Optional
@@ -26,7 +33,7 @@ STYLE_SHEET = """
         text-align: left;
         padding: 12px 20px;
         border: none;
-        font-size: 14px;
+        font-size: 18px;
         border-radius: 8px;
     }
     QPushButton.nav-btn:hover { background-color: #006600; }
@@ -50,7 +57,7 @@ STYLE_SHEET = """
 
 class MainWindow(QMainWindow):
     logoutRequested = pyqtSignal()
-    
+    profileUpdateRequested = pyqtSignal(str, str, str, str)
     def __init__(self):
         super().__init__()
         self.current_user: Optional[UserModel] = None
@@ -78,25 +85,35 @@ class MainWindow(QMainWindow):
         self.pages = QStackedWidget()
         right_layout.addWidget(self.pages)
         
+        self.conn = None
+        self._setup_db()
+        
         main_layout.addWidget(right_widget)
-        # inisiasi halaman home
+ 
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = QWidget() 
-        self.settings_page = QWidget() 
+        self.settings_page = QWidget()
+        
+        self.reports_page = None
         self.detail_page = PlantDetails()
 
         self.profile_page = DisplayProfile(self.current_user, self)
         
         self.setStyleSheet(STYLE_SHEET)
-        # Tambahkan ke Stacked Widget
-        self.pages.addWidget(self.home_page)      # index 0 (Home)
-        self.pages.addWidget(self.community_page) # index 1 (Community)
-        self.pages.addWidget(self.todo_page)      # index 2 (Todo)
-        self.pages.addWidget(self.settings_page)  # index 3 (Settings)
-        self.pages.addWidget(self.detail_page)    # index 4 (Plant Details)
+ 
+        self.pages.addWidget(self.home_page)      
+        self.pages.addWidget(self.community_page) 
+        self.pages.addWidget(self.todo_page)      
+        self.pages.addWidget(self.settings_page) 
+        self.pages.addWidget(self.detail_page)   
         self.pages.addWidget(self.profile_page)
         
+        # Placeholder for reports page so navigation index stays stable
+        self._reports_placeholder = QWidget()
+        self._reports_placeholder.setVisible(False)
+        self.pages.addWidget(self._reports_placeholder)  # index 4 (placeholder)
+
         self.nav_buttons = self.sidebar.get_nav_buttons()
         
         self.nav_mapping = {
@@ -105,6 +122,9 @@ class MainWindow(QMainWindow):
             self.nav_buttons["todo"]: 2,
             self.nav_buttons["settings"]: 3,
         }
+        if "reports" in self.nav_buttons:
+            # Report index 4
+            self.nav_mapping[self.nav_buttons["reports"]] = 4
         
         for btn, index in self.nav_mapping.items():
             btn.clicked.connect(lambda checked, i=index, b=btn: self._switch_page_and_update_sidebar(i, b))
@@ -132,12 +152,25 @@ class MainWindow(QMainWindow):
         for btn in self.nav_buttons.values():
             btn.setChecked(False)
  
+    def _setup_db(self):
+        """Setup database connection."""
+        try:
+            self.conn = sqlite3.connect(DB_FILE_PATH)
+            self.conn.row_factory = sqlite3.Row
+            if Report:
+                Report.create_table(self.conn)
+        except Exception as e:
+            print(f"❌ Error setting up database: {e}")
+            self.conn = None
+    
     def set_current_user(self, user_model):
         self.current_user = user_model
         
         if hasattr(self.sidebar, 'update_profile_button'):
             self.sidebar.update_profile_button(user_model)
-
+            
+        self.profile_page.update_user_data(user_model)
+        
         user_lbl = self.sidebar.findChild(QLabel, 'user_info_label')
         if user_lbl:
             user_lbl.setText(f"👤 {user_model.username}\nID: {user_model.userID}")
@@ -147,6 +180,27 @@ class MainWindow(QMainWindow):
         
         if hasattr(self.community_page, 'post_manager'):
             self.community_page.post_manager.set_current_user(user_model)
+        
+        is_admin = user_model.role == "admin"
+        self.sidebar.set_admin_mode(is_admin)
+        
+        if is_admin:
+            if self.reports_page is None and AdminReportDisplay and self.conn:
+                self.reports_page = AdminReportDisplay(DB_FILE_PATH, self.conn, user_model, self)
+                try:
+
+                    placeholder = self._reports_placeholder
+                    self.pages.removeWidget(placeholder)
+                except Exception:
+                    pass
+                self.pages.insertWidget(4, self.reports_page)
+
+                if "reports" in self.nav_buttons:
+                    self.nav_mapping[self.nav_buttons["reports"]] = 4
+                    self.nav_buttons["reports"].clicked.connect(
+                        lambda checked, i=4, b=self.nav_buttons["reports"]: 
+                        self._switch_page_and_update_sidebar(i, b)
+                    )
         
     def _switch_page_and_update_sidebar(self, index: int, active_button: QPushButton):
         self.pages.setCurrentIndex(index)

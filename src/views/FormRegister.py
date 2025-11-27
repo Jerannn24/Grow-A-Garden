@@ -276,18 +276,18 @@ class RegisterForm(QWidget):
         formLayout.addWidget(inputLocation)
 
         # Password
-        labelPass, inputPass = createFormField("Password", "••••••••", isPassword=True)
+        labelPass, inputPass = createFormField("Password", "Password", isPassword=True)
         formLayout.addWidget(labelPass)
         formLayout.addWidget(inputPass)
         
         # Confirm Password
-        labelConfirm, inputConfirm = createFormField("Confirm Password", "••••••••", isPassword=True)
+        labelConfirm, inputConfirm = createFormField("Confirm Password", "Confirm password", isPassword=True)
         formLayout.addWidget(labelConfirm)
         formLayout.addWidget(inputConfirm)
         
         signupButton = QPushButton("Sign Up")
         signupButton.setFont(QFont('Geist', 14, QFont.Bold))
-        
+        self.signupButton.setDefault(True)
         signupButton.setStyleSheet("""
             QPushButton {
                 background-color: #076804;
@@ -338,9 +338,37 @@ class RegisterForm(QWidget):
                 self.inputConfirm.text()    
             )
         )
+
+        # Allow pressing Enter (Return) in any input field to trigger registration
+        try:
+            self.inputName.returnPressed.connect(self.signupButton.click)
+            self.inputEmail.returnPressed.connect(self.signupButton.click)
+            self.inputLocation.returnPressed.connect(self.signupButton.click)
+            self.inputPass.returnPressed.connect(self.signupButton.click)
+            self.inputConfirm.returnPressed.connect(self.signupButton.click)
+        except Exception:
+            # fallback using keyPressEvent
+            pass
+
+    def keyPressEvent(self, event):
+        from PyQt5.QtCore import Qt as _Qt
+        if event.key() in (_Qt.Key_Return, _Qt.Key_Enter):
+            # Avoid duplicate submission: if focus is on a QLineEdit, returnPressed already
+            # triggers the signup button; only submit here when focus is not an input
+            focused = self.focusWidget()
+            from PyQt5.QtWidgets import QLineEdit as _QLineEdit
+            if not isinstance(focused, _QLineEdit):
+                self.registerRequested.emit(
+                    self.inputName.text(),      
+                    self.inputEmail.text(),     
+                    self.inputPass.text(),      
+                    self.inputLocation.text(),  
+                    self.inputConfirm.text()    
+                )
+        else:
+            super().keyPressEvent(event)
     
     def clearForm(self):
-        """Membersihkan semua field input."""
         self.inputName.clear()
         self.inputEmail.clear()
         self.inputPass.clear()
