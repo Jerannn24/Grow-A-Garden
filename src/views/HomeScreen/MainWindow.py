@@ -1,5 +1,5 @@
 import sqlite3
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel, QDialog
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from models.UserModel import DB_FILE_PATH
@@ -11,7 +11,6 @@ from .HomePage import HomePage
 from views.PlantDetails import PlantDetails
 from controllers.ToDoListManager import ToDoListManager
 from views.DisplaySettings import DisplaySettings
-from views.ChangePasswordForm import ChangePasswordForm
 
 from models.UserModel import UserModel
 from typing import Optional
@@ -85,9 +84,8 @@ class MainWindow(QMainWindow):
         self.home_page = HomePage()
         self.community_page = DisplayCommunity(db_path=DB_FILE_PATH) 
         self.todo_page = ToDoListManager(self.current_user)
-        self.settings_page = DisplaySettings()
+        self.settings_page = DisplaySettings(user_model=None)  # Will be set in set_current_user()
         self.detail_page = PlantDetails()
-        self.password_form = ChangePasswordForm()
 
         self.profile_page = DisplayProfile(self.current_user, self)
         
@@ -130,12 +128,8 @@ class MainWindow(QMainWindow):
             self.todo_page.backRequested.connect(self.go_back_to_home)
         
         # Connect settings page signals
-        self.settings_page.change_password_requested.connect(self.show_change_password_form)
+        self.settings_page.password_changed.connect(self.handle_password_change)
         self.settings_page.settings_changed.connect(self.handle_settings_change)
-        
-        # Connect password form signals
-        self.password_form.switchToLoginRequested.connect(self.go_back_to_home)
-        self.password_form.changePasswordRequested.connect(self.handle_password_change)
     
         
     def displayProfile(self):       
@@ -149,6 +143,9 @@ class MainWindow(QMainWindow):
  
     def set_current_user(self, user_model):
         self.current_user = user_model
+        
+        # Update settings page with current user
+        self.settings_page.user_model = user_model
         
         if hasattr(self.sidebar, 'update_profile_button'):
             self.sidebar.update_profile_button(user_model)
@@ -204,31 +201,23 @@ class MainWindow(QMainWindow):
     def go_back_to_home(self):
         self._switch_page_and_update_sidebar(0, self.nav_buttons["home"])
     
-    def show_change_password_form(self):
-        """Display the change password form as a dialog"""
-        self.password_form.clearForm()
-        self.password_form.exec_()
-    
     def handle_settings_change(self, settings: dict):
         """Handle when settings are changed"""
         if self.current_user:
             print(f"Settings changed: {settings}")
             # TODO: Save settings to database
     
-    def handle_password_change(self, username: str, email: str, new_pass: str, confirm_pass: str):
+    def handle_password_change(self, new_password: str, confirm_password: str):
         """Handle password change request"""
-        if new_pass != confirm_pass:
-            self.password_form.error_display.emit("Passwords do not match!")
+        if new_password != confirm_password:
+            print("Passwords do not match!")
             return
         
-        if len(new_pass) < 6:
-            self.password_form.error_display.emit("Password must be at least 6 characters!")
+        if len(new_password) < 6:
+            print("Password must be at least 6 characters!")
             return
         
         if self.current_user:
-            success, message = self.current_user.changePassword(username, email, new_pass, confirm_pass)
-            if success:
-                self.password_form.error_display.emit(f"✓ {message}")
-                self.password_form.clearForm()
-            else:
-                self.password_form.error_display.emit(f"✗ {message}")
+            # For now, just print - backend implementation would go here
+            print(f"Password change requested for user: {self.current_user.getUsername()}")
+            # TODO: Implement actual password change with current password verification

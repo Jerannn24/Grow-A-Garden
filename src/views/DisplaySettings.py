@@ -1,20 +1,23 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
-    QCheckBox, QFrame, QScrollArea, QSpacing
+    QCheckBox, QFrame, QScrollArea
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QCursor
+from views.ChangePasswordPopUp import ChangePasswordPopUp
 
 
 class DisplaySettings(QWidget):
     """Settings page for user preferences and account management"""
     
     # Signals
-    change_password_requested = pyqtSignal()
+    password_changed = pyqtSignal(str, str)  # Emits (new_password, confirm_password)
     settings_changed = pyqtSignal(dict)  # Emits dict with changed settings
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None, user_model=None):
+        super().__init__(parent)
+        self.password_popup = None
+        self.user_model = user_model
         self.setStyleSheet("""
             QWidget { background-color: #F8F9FA; }
             .QFrame#CardFrame { background-color: white; border-radius: 16px; border: 1px solid #E0E0E0; }
@@ -199,8 +202,19 @@ class DisplaySettings(QWidget):
         self.settings_changed.emit(settings)
     
     def on_change_password_clicked(self):
-        """Emit signal when change password is clicked"""
-        self.change_password_requested.emit()
+        """Show the change password popup dialog"""
+        print(f"DEBUG DisplaySettings: user_model = {self.user_model}")
+        print(f"DEBUG DisplaySettings: user_model type = {type(self.user_model)}")
+        if self.user_model:
+            print(f"DEBUG DisplaySettings: username = {self.user_model.getUsername()}, id = {self.user_model.getUserID()}")
+        
+        self.password_popup = ChangePasswordPopUp(self.user_model, self)
+        self.password_popup.password_changed.connect(self.handle_password_change)
+        self.password_popup.exec_()
+    
+    def handle_password_change(self, new_password: str, confirm_password: str):
+        """Handle password change from popup"""
+        self.password_changed.emit(new_password, confirm_password)
     
     def set_notification_settings(self, email_enabled, push_enabled):
         """Load and display saved notification settings"""
